@@ -1,7 +1,7 @@
-#define FORWARD     (5)     // These pins need to be PWM capable
-#define BACKWARD    (6)
-#define LEFT        (9)
-#define RIGHT       (10)
+#define FB1         (5)     // These pins need to be PWM capable
+#define FB2         (6)
+#define LR1         (9)
+#define LR2         (10)
 
 #define IR_INT  (2)         // IR sensors ORed to create interrupt signal;
 
@@ -45,7 +45,7 @@ public:
         }
         this->pwm = pwm;
         digitalWrite(this->outB, LOW);
-        analogWrite(this->outB, pwm);
+        analogWrite(this->outA, pwm);
     }
     
     inline void reverse(int16_t pwm)
@@ -71,7 +71,7 @@ public:
         digitalWrite(this->outB, LOW); 
     }
     
-    inline int16_t getPwm() { return this-<pwm; }
+    inline int16_t getPwm() { return this->pwm; }
 };
 
 struct
@@ -94,11 +94,11 @@ public:
     bool any()
     {
         uint8_t *bytePtr = (uint8_t *)this;
-        for (int i = 0; i < sizeof(robotSensors); i++) {
+        /*for (int i = 0; i < sizeof(robotSensors); i++) {
             if (bytePtr[i]) {
                 return true;
             }
-        }
+        }*/
         return false;
     }
     
@@ -124,17 +124,33 @@ void setup()
     Serial.begin(115200);
 #endif
     
-    mcForwardBackward = new MotorControl(FORWARD, BACKWARD);
-    mcLeftRight = new MotorControl(LEFT, RIGHT);
+    mcForwardBackward = new MotorControl(FB1, FB2);
+    mcLeftRight = new MotorControl(LR1, LR2);
     
     pinMode(IR_INT, INPUT);
     attachInterrupt(digitalPinToInterrupt(IR_INT), IR_ISR, FALLING);
     
-    pinMode(IR_SENSE1, INPUT);
+    //pinMode(IR_SENSE1, INPUT);
+    
+    /*mcForwardBackward->forward(64);
+    delay(750);
+    mcForwardBackward->brake();
+    //mcForwardBackward->standby();
+    delay(100);
+    mcForwardBackward->reverse(64);
+    delay(750);
+    //mcForwardBackward->standby();
+    mcForwardBackward->brake();*/
+    
+    mcLeftRight->forward(255);
+    delay(250);
+    mcLeftRight->reverse(255);
+    delay(250);
+    mcLeftRight->brake();
 }
 
 void loop()
 {
-    PRINT(
+    //PRINT(
     //Serial.println(digitalRead(LINE_SENSE1));
 }
