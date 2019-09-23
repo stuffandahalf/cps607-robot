@@ -1,9 +1,13 @@
-#define FB1         (6)     // These pins need to be PWM capable
+// Motor control pins
+// Must be PWM capable
+#define FB1         (6)
 #define FB2         (5)
 #define LR1         (9)
 #define LR2         (10)
 
-#define IR_INT  (2)         // IR sensors ORed to create interrupt signal;
+// IR sensors are active low, AND them all
+// together and use output for interrupt
+#define IR_INT      (2)
 
 #define IR_SENSE_FL (A0)    // General IR input
 #define IR_SENSE_FR (A1)
@@ -18,6 +22,25 @@
 #define PRINT(...)
 #endif
 
+#define IRSTATUS_CLEAR              (0u)
+#define IRSTATUS_FRONT_RIGHT        (1u)
+#define IRSTATUS_FRONT_LEFT         (2u)
+#define IRSTATUS_BACK_RIGHT         (4u)
+#define IRSTATUS_BACK_LEFT          (8u)
+
+#define IRSTATUS_FRONT_EDGE         (IRSTATUS_FRONT_LEFT | IRSTATUS_FRONT_RIGHT)
+#define IRSTATUS_BACK_EDGE          (IRSTATUS_BACK_LEFT | IRSTATUS_BACK_RIGHT)
+#define IRSTATUS_LEFT_EDGE          (IRSTATUS_FRONT_LEFT | IRSTATUS_BACK_LEFT)
+#define IRSTATUS_RIGHT_EDGE         (IRSTATUS_FRONT_RIGHT | IRSTATUS_BACK_RIGHT)
+
+#define IRSTATUS_FRONT_RIGHT_EDGES  (IRSTATUS_FRONT_EDGE | IRSTATUS_BACK_RIGHT)
+#define IRSTATUS_FRONT_LEFT_EDGES   (IRSTATUS_FRONT_EDGE | IRSTATUS_BACK_LEFT)
+#define IRSTATUS_BACK_RIGHT_EDGES   (IRSTATUS_BACK_EDGE | IRSTATUS_FRONT_RIGHT)
+#define IRSTATUS_BACK_LEFT_EDGES    (IRSTATUS_BACK_EDGE | IRSTATUS_FRONT_LEFT)
+
+#define IRSTATUS_TRAPPED            (15u)
+
+#define TURN_PWM (80)
 
 class MotorControl
 {
@@ -38,7 +61,10 @@ public:
         
         brake();
     }
-
+    
+    inline void resume() { this->forward(); }
+    
+    inline void forward() { this->forward(this->pwm); }
     inline void forward(int16_t pwm)
     {
         if (pwm < 0) {
@@ -53,6 +79,7 @@ public:
         analogWrite(this->outA, pwm & 0xFF);
     }
     
+    inline void reverse() { this->forward(this->pwm * -1); }
     inline void reverse(int16_t pwm)
     {
         if (pwm < 0) {
@@ -81,48 +108,35 @@ public:
     inline int16_t getPwm() { return this->pwm; }
 };
 
-struct
+uint8_t getIRStatus()
 {
-    struct
-    {
-        struct
-        {
-            bool left;
-            bool right;
-        } front;
-        struct
-        {
-            bool left;
-            bool right;
-        } back;
-    } edge;
-    
-public:
-    bool any()
-    {
-        uint8_t *bytePtr = (uint8_t *)this;
-        /*for (int i = 0; i < sizeof(robotSensors); i++) {
-            if (bytePtr[i]) {
-                return true;
-            }
-        }*/
-        return false;
+    uint8_t state = IRSTATUS_CLEAR;
+    if (!digitalRead(IR_SENSE_FL)) {
+        state |= IRSTATUS_FRONT_LEFT;
     }
-    
-} robotSensors;
+    if (!digitalRead(IR_SENSE_FR)) {
+        state |= IRSTATUS_FRONT_RIGHT;
+    }
+    if (!digitalRead(IR_SENSE_BL)) {
+        state |= IRSTATUS_BACK_LEFT;
+    }
+    if (!digitalRead(IR_SENSE_BR)) {
+        state |= IRSTATUS_BACK_RIGHT;
+    }
+    return state;
+}
 
+bool interrupted;
+bool handled;
 MotorControl *mcForwardBackward;
 MotorControl *mcLeftRight;
 
-void IR_ISR()
+void IR_ISR()   // interrupt service routine when an IR sensor goes active
 {
     mcForwardBackward->brake();
     mcLeftRight->brake();
-    
-    /*robotSensors.edge.front.left = digitalRead(IR_SENSE_FL);
-    robotSensors.edge.front.right = digitalRead(IR_SENSE_FR);
-    robotSensors.edge.back.left = digitalRead(IR_SENSE_BL);
-    robotSensors.edge.back.right = digitalRead(IR_SENSE_BR);*/
+    interrupted = true;
+    handled = false;
 }
 
 void setup()
@@ -130,11 +144,19 @@ void setup()
 #ifdef SERIAL_DEBUG
     Serial.begin(115200);
 #endif
-    
+
     mcForwardBackward = new MotorControl(FB1, FB2);
     mcLeftRight = new MotorControl(LR1, LR2);
+    interrupted = false;
+    handled = false;
     
     pinMode(IR_INT, INPUT);
+    
+    pinMode(IR_SENSE_FL, INPUT);
+    pinMode(IR_SENSE_FR, INPUT);
+    pinMode(IR_SENSE_BL, INPUT);
+    pinMode(IR_SENSE_BR, INPUT);
+    
     attachInterrupt(digitalPinToInterrupt(IR_INT), IR_ISR, FALLING);
     
     //pinMode(IR_SENSE1, INPUT);
@@ -159,8 +181,82 @@ void setup()
     //mcLeftRight->brake();
 }
 
+// left = reverse
+// right = forward
+
 void loop()
 {
-    //PRINT(
-    //Serial.println(digitalRead(LINE_SENSE1));
+    if (!interrupted) {
+        return;
+    }
+    if (handled) {
+        return;
+    }
+    uint16_t ir_status;
+    while ((ir_status = getIRStatus()) != IRSTATUS_CLEAR) {
+        mcLeftRight->brake();   // might need to reconsider
+        switch (ir_status) {
+        // corner cases
+        case IRSTATUS_FRONT_LEFT:
+            mcForwardBackward->reverse();
+            mcLeftRight->reverse(TURN_PWM);
+            /*delay(750);
+            mcLeftRight->brake();
+            mcForwardBackward->forward();*/
+            break;
+        case IRSTATUS_FRONT_RIGHT:
+            mcForwardBackward->reverse();
+            mcLeftRight->forward(TURN_PWM);
+            /*delay(750);
+            mcLeftRight->brake();
+            mcForwardBackward->forward();*/
+            break;
+        case IRSTATUS_BACK_LEFT:
+            mcForwardBackward->reverse();
+            mcLeftRight->reverse(TURN_PWM);
+            break;
+        case IRSTATUS_BACK_RIGHT:
+            mcForwardBackward->reverse();
+            mcLeftRight->forward(TURN_PWM);
+            break;
+        
+        // edge cases
+        case IRSTATUS_FRONT_EDGE:
+        case IRSTATUS_BACK_EDGE:
+            mcForwardBackward->reverse();
+            break;
+        case IRSTATUS_LEFT_EDGE:
+            mcLeftRight->reverse(TURN_PWM);
+            break;
+        case IRSTATUS_RIGHT_EDGE:
+            mcLeftRight->forward(TURN_PWM);
+            break;
+            
+        // 2 edges
+        case IRSTATUS_FRONT_LEFT_EDGES:
+            mcLeftRight->forward(TURN_PWM);
+            mcForwardBackward->reverse();
+            break;
+        case IRSTATUS_FRONT_RIGHT_EDGES:
+            mcLeftRight->reverse(TURN_PWM);
+            mcForwardBackward->reverse();
+            break;
+        case IRSTATUS_BACK_LEFT_EDGES:
+            mcLeftRight->forward(TURN_PWM);
+            mcForwardBackward->reverse();
+            break;
+        case IRSTATUS_BACK_RIGHT_EDGES:
+            mcLeftRight->reverse(TURN_PWM);
+            mcForwardBackward->reverse();
+            break;
+            
+        case IRSTATUS_TRAPPED:
+            // Trapped, nowhere to move, will resume if relocated
+            break;
+        }
+    }
+    mcLeftRight->brake();
+    mcForwardBackward->resume();
+    
+    handled = true;
 }
