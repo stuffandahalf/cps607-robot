@@ -1,14 +1,16 @@
-#define FB1         (5)     // These pins need to be PWM capable
-#define FB2         (6)
+#define FB1         (6)     // These pins need to be PWM capable
+#define FB2         (5)
 #define LR1         (9)
 #define LR2         (10)
 
 #define IR_INT  (2)         // IR sensors ORed to create interrupt signal;
 
-#define IR_SENSE_FL (4)     // General IR input
-#define IR_SENSE_FR (7)
-#define IR_SENSE_BL (8)
-#define IR_SENSE_BR (11)
+#define IR_SENSE_FL (A0)    // General IR input
+#define IR_SENSE_FR (A1)
+#define IR_SENSE_BL (A5)
+#define IR_SENSE_BR (A4)
+
+#define SERIAL_DEBUG
 
 #ifdef SERIAL_DEBUG
 #define PRINT(...) Serial.println(__VA_ARGS__)
@@ -43,9 +45,12 @@ public:
             reverse(pwm * -1);
             return;
         }
-        this->pwm = pwm;
+        this->pwm = pwm & 0xFF;
+        
         digitalWrite(this->outB, LOW);
-        analogWrite(this->outA, pwm);
+        analogWrite(this->outA, 100);
+        delay(75);
+        analogWrite(this->outA, pwm & 0xFF);
     }
     
     inline void reverse(int16_t pwm)
@@ -54,9 +59,11 @@ public:
             forward(pwm * -1);
             return;
         }
-        this->pwm = pwm * -1;
+        this->pwm = (pwm & 0xFF) * -1;
         digitalWrite(this->outA, LOW);
-        analogWrite(this->outB, pwm);
+        analogWrite(this->outB, 100);
+        delay(75);
+        analogWrite(this->outB, pwm & 0xFF);
     }
     
     inline void brake()
@@ -112,10 +119,10 @@ void IR_ISR()
     mcForwardBackward->brake();
     mcLeftRight->brake();
     
-    robotSensors.edge.front.left = digitalRead(IR_SENSE_FL);
+    /*robotSensors.edge.front.left = digitalRead(IR_SENSE_FL);
     robotSensors.edge.front.right = digitalRead(IR_SENSE_FR);
     robotSensors.edge.back.left = digitalRead(IR_SENSE_BL);
-    robotSensors.edge.back.right = digitalRead(IR_SENSE_BR);
+    robotSensors.edge.back.right = digitalRead(IR_SENSE_BR);*/
 }
 
 void setup()
@@ -141,12 +148,15 @@ void setup()
     delay(750);
     //mcForwardBackward->standby();
     mcForwardBackward->brake();*/
+    mcForwardBackward->forward(50);
     
-    mcLeftRight->forward(255);
+    /*mcLeftRight->forward(255);
     delay(250);
     mcLeftRight->reverse(255);
     delay(250);
-    mcLeftRight->brake();
+    mcLeftRight->brake();*/
+    //delay(2000);
+    //mcLeftRight->brake();
 }
 
 void loop()
