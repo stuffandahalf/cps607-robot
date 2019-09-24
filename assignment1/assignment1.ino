@@ -5,7 +5,7 @@
 #define LR1         (9)
 #define LR2         (10)
 
-//#define USING_INTERRUPTS  // uncomment this to swittch to using interrupts, couldn't get transistor AND gate working
+//#define USING_INTERRUPTS  // uncomment this to switch to using interrupts, couldn't get transistor AND gate working
 
 #ifdef USING_INTERRUPTS
 // IR sensors are active low, AND them all
