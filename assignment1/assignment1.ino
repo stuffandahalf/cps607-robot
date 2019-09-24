@@ -5,9 +5,13 @@
 #define LR1         (9)
 #define LR2         (10)
 
+//#define USING_INTERRUPTS  // uncomment this to swittch to using interrupts, couldn't get AND gate working
+
+#ifdef USING_INTERRUPTS
 // IR sensors are active low, AND them all
 // together and use output for interrupt
 #define IR_INT      (2)
+#endif
 
 #define IR_SENSE_FL (A0)    // General IR input
 #define IR_SENSE_FR (A1)
@@ -126,11 +130,14 @@ uint8_t getIRStatus()
     return state;
 }
 
+#ifdef USING_INTERRUPTS
 bool interrupted;
 bool handled;
+#endif
 MotorControl *mcForwardBackward;
 MotorControl *mcLeftRight;
 
+#ifdef USING_INTERRUPTS
 void IR_ISR()   // interrupt service routine when an IR sensor goes active
 {
     mcForwardBackward->brake();
@@ -138,6 +145,7 @@ void IR_ISR()   // interrupt service routine when an IR sensor goes active
     interrupted = true;
     handled = false;
 }
+#endif
 
 void setup()
 {
@@ -147,18 +155,19 @@ void setup()
 
     mcForwardBackward = new MotorControl(FB1, FB2);
     mcLeftRight = new MotorControl(LR1, LR2);
-    interrupted = false;
-    handled = false;
-    
-    pinMode(IR_INT, INPUT);
     
     pinMode(IR_SENSE_FL, INPUT);
     pinMode(IR_SENSE_FR, INPUT);
     pinMode(IR_SENSE_BL, INPUT);
     pinMode(IR_SENSE_BR, INPUT);
     
-    attachInterrupt(digitalPinToInterrupt(IR_INT), IR_ISR, FALLING);
+#ifdef USING_INTERRUPTS
+    interrupted = false;
+    handled = false;
     
+    pinMode(IR_INT, INPUT);
+    attachInterrupt(digitalPinToInterrupt(IR_INT), IR_ISR, FALLING);
+#endif    
     //pinMode(IR_SENSE1, INPUT);
     
     /*mcForwardBackward->forward(64);
@@ -186,14 +195,19 @@ void setup()
 
 void loop()
 {
+#ifdef USING_INTERRUPTS
     if (!interrupted) {
         return;
     }
     if (handled) {
         return;
     }
+#endif
     uint16_t ir_status;
     while ((ir_status = getIRStatus()) != IRSTATUS_CLEAR) {
+#ifndef USING_INTERRUPTS
+        mcForwardBackward->brake();
+#endif
         mcLeftRight->brake();   // might need to reconsider
         switch (ir_status) {
         // corner cases
@@ -258,5 +272,7 @@ void loop()
     mcLeftRight->brake();
     mcForwardBackward->resume();
     
+#ifdef USING_INTERRUPTS
     handled = true;
+#endif
 }
