@@ -44,9 +44,8 @@
 
 #define IRSTATUS_TRAPPED            (15u)
 
-//#define TURN_PWM (80)
-//#define TURN_PWM (255)
 #define TURN_PWM (200)
+#define TURN_DELAY (500)
 #define SPEED_PWM (70)
 
 class MotorControl
@@ -254,24 +253,28 @@ void loop()
             if (mcForwardBackward->getPwm() >= 0) {
                 mcForwardBackward->reverse();
                 mcLeftRight->forward(TURN_PWM);
+                delay(TURN_DELAY);
             }
             break;
         case IRSTATUS_FRONT_RIGHT:
             if (mcForwardBackward->getPwm() >= 0) {
                 mcForwardBackward->reverse();
                 mcLeftRight->reverse(TURN_PWM);
+                delay(TURN_DELAY);
             }
             break;
         case IRSTATUS_BACK_LEFT:
             if (mcForwardBackward->getPwm() <= 0) {
                 mcForwardBackward->reverse();
                 mcLeftRight->reverse(TURN_PWM);
+                delay(TURN_DELAY);
             }
             break;
         case IRSTATUS_BACK_RIGHT:
             if (mcForwardBackward->getPwm() <= 0) {
                 mcForwardBackward->reverse();
                 mcLeftRight->forward(TURN_PWM);
+                delay(TURN_DELAY);
             }
             break;
         
@@ -288,12 +291,14 @@ void loop()
                 mcLeftRight->brake();
             }
             break;
-        //case IRSTATUS_LEFT_EDGE:
-            //mcLeftRight->reverse(TURN_PWM);
-            //break;
-        //case IRSTATUS_RIGHT_EDGE:
-            //mcLeftRight->forward(TURN_PWM);
-            //break;
+        case IRSTATUS_LEFT_EDGE:
+            mcLeftRight->reverse(TURN_PWM);
+            delay(TURN_DELAY);
+            break;
+        case IRSTATUS_RIGHT_EDGE:
+            mcLeftRight->forward(TURN_PWM);
+            delay(TURN_DELAY);
+            break;
             
         //// 2 edges
         //case IRSTATUS_FRONT_LEFT_EDGES:
