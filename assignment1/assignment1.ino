@@ -46,17 +46,21 @@
 #define DIRECTION_REVERSE           (1 << 3)
 #define DIRECTION_UNDEFINED         (1 << 7)
 
-//#define RIGHT_TURN_PWM (185)
-#define RIGHT_TURN_PWM (200)
+#define RIGHT_TURN_PWM (185)
+//#define RIGHT_TURN_PWM (200)
 #define LEFT_TURN_PWM (200)
 #define TURN_DELAY (100)
 #define SPEED_PWM (75)
+#define SPEED_TURN_PWM (85)
 
 // When running the motors at a low speed, need to start with a higher PWM to avoid stalling
 //#define KICKSTART_PWM   100
 //#define KICKSTART_PWM   150
-#define KICKSTART_PWM   125
+#define KICKSTART_PWM   (125)
 #define KICKSTART_DELAY (255 - KICKSTART_PWM)
+
+#define TURN_KICKSTART_PWM  (255)
+#define TURN_KICKSTART_DELAY (255 - TURN_KICKSTART_PWM)
 
 class MotorControl
 {
@@ -65,10 +69,19 @@ private:
     uint8_t outB;
     
     int16_t pwm;
+    bool brakeStatus;
+    
+    uint8_t kickstartPwm;
+    uint8_t kickstartDelay;
 
 public:
+
+
     MotorControl(uint8_t outA, uint8_t outB)
     {
+        this->kickstartPwm = KICKSTART_PWM;
+        this->kickstartDelay = KICKSTART_DELAY;
+        
         this->outA = outA;
         this->outB = outB;
         
@@ -78,11 +91,21 @@ public:
         brake();
     }
     
+    MotorControl(uint8_t outA, uint8_t outB, uint8_t kickstartPwm, uint8_t kickstartDelay) : MotorControl(outA, outB)
+    {
+        this->kickstartPwm = kickstartPwm;
+        this->kickstartDelay = kickstartDelay;
+    }
+    
     inline void resume() { this->forward(); }
     
     inline void forward() { this->forward(this->pwm); }
     inline void forward(int16_t pwm)
     {
+        if (pwm == 0) {
+            this->brake();
+            return;
+        }
         if (pwm < 0) {
             reverse(pwm * -1);
             return;
@@ -93,6 +116,7 @@ public:
         analogWrite(this->outA, KICKSTART_PWM);
         delay(KICKSTART_DELAY);
         analogWrite(this->outA, pwm & 0xFF);
+        this->brakeStatus = false;
     }
     
     inline void reverse() { this->forward(this->pwm * -1); }
@@ -107,12 +131,14 @@ public:
         analogWrite(this->outB, KICKSTART_PWM);
         delay(KICKSTART_DELAY);
         analogWrite(this->outB, pwm & 0xFF);
+        this->brakeStatus = false;
     }
     
     inline void brake()
     {
         digitalWrite(this->outA, HIGH);
         digitalWrite(this->outB, HIGH);
+        this->brakeStatus = true;
     }
     
     inline void standby()
@@ -121,6 +147,7 @@ public:
         digitalWrite(this->outB, LOW); 
     }
     
+    inline bool getBrakeStatus() { return this->brakeStatus; }
     inline int16_t getPwm() { return this->pwm; }
 };
 
@@ -219,7 +246,7 @@ void setup()
 #endif
 
     mcForwardBackward = new MotorControl(FB1, FB2);
-    mcLeftRight = new MotorControl(LR1, LR2);
+    mcLeftRight = new MotorControl(LR1, LR2, TURN_KICKSTART_PWM, TURN_KICKSTART_DELAY);
     
     pinMode(IR_SENSE_FL, INPUT);
     pinMode(IR_SENSE_FR, INPUT);
@@ -395,6 +422,49 @@ void loop()
             delay(TURN_DELAY);
             break;
             
+        case IRSTATUS_FRONT_LEFT | IRSTATUS_BACK_RIGHT:
+            direction = DIRECTION_NONE;
+            if (lastDirection & DIRECTION_FORWARD) {
+                mcForwardBackward->reverse(SPEED_PWM);
+                direction |= DIRECTION_REVERSE;
+            }
+            else {
+                mcForwardBackward->forward(SPEED_PWM);
+                direction |= DIRECTION_FORWARD;
+            }
+            if (lastDirection & DIRECTION_RIGHT) {
+                mcLeftRight->forward(LEFT_TURN_PWM);
+                direction |= DIRECTION_LEFT;
+                delay(TURN_DELAY);
+            }
+            else {
+                mcLeftRight->reverse(RIGHT_TURN_PWM);
+                direction |= DIRECTION_RIGHT;
+                delay(TURN_DELAY);
+            }
+            break;
+        case IRSTATUS_FRONT_RIGHT | IRSTATUS_BACK_LEFT:
+            direction = DIRECTION_NONE;
+            if (lastDirection & DIRECTION_FORWARD) {
+                mcForwardBackward->reverse(SPEED_PWM);
+                direction |= DIRECTION_REVERSE;
+            }
+            else {
+                mcForwardBackward->forward(SPEED_PWM);
+                direction |= DIRECTION_FORWARD;
+            }
+            if (lastDirection & DIRECTION_LEFT) {
+                mcLeftRight->reverse(RIGHT_TURN_PWM);
+                direction |= DIRECTION_RIGHT;
+                delay(TURN_DELAY);
+            }
+            else {
+                mcLeftRight->forward(LEFT_TURN_PWM);
+                direction |= DIRECTION_LEFT;
+                delay(TURN_DELAY);
+            }
+            break;
+            
         case IRSTATUS_TRAPPED:
             // Trapped, nowhere to move, will resume if relocated
             break;
@@ -406,8 +476,17 @@ void loop()
         //mcLeftRight->brake();
         //mcForwardBackward->resume();
     }
-    else {
-        mcLeftRight->brake();
+    if (!mcLeftRight->getBrakeStatus()) {
+        if (mcLeftRight->getPwm() > 0) {
+            mcLeftRight->forward(mcLeftRight->getPwm() - 1);
+            //mcLeftRight->brake();
+        }
+        else if (mcLeftRight->getPwm() < 0) {
+            mcLeftRight->forward(mcLeftRight->getPwm() + 1);
+        }
+        else {
+            mcLeftRight->brake();
+        }
     }
     
     if (direction != DIRECTION_UNDEFINED) {
