@@ -49,7 +49,6 @@
 //#define RIGHT_TURN_PWM (185)
 #define RIGHT_TURN_PWM (200)
 #define LEFT_TURN_PWM (200)
-//#define TURN_DELAY (250)
 #define TURN_DELAY (100)
 #define SPEED_PWM (75)
 
@@ -398,6 +397,10 @@ void loop()
             
         case IRSTATUS_TRAPPED:
             // Trapped, nowhere to move, will resume if relocated
+            break;
+        default:
+            mcForwardBackward->brake();
+            mcLeftRight->brake();
             break;
         }
         //mcLeftRight->brake();
