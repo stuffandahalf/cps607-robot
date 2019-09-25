@@ -49,9 +49,9 @@
 #define RIGHT_TURN_PWM (185)
 //#define RIGHT_TURN_PWM (200)
 #define LEFT_TURN_PWM (200)
-#define TURN_DELAY (100)
-#define SPEED_PWM (75)
-#define SPEED_TURN_PWM (85)
+//#define TURN_DELAY (100)
+#define TURN_DELAY (0)
+#define SPEED_PWM (70)
 
 // When running the motors at a low speed, need to start with a higher PWM to avoid stalling
 //#define KICKSTART_PWM   100
@@ -225,6 +225,7 @@ void printIRStatus(uint8_t status)
 bool interrupted;
 bool handled;
 #endif
+uint16_t lastStatus;
 uint8_t lastDirection;
 MotorControl *mcForwardBackward;
 MotorControl *mcLeftRight;
@@ -399,12 +400,18 @@ void loop()
             mcLeftRight->reverse(RIGHT_TURN_PWM);
             delay(TURN_DELAY / 2);
             mcForwardBackward->reverse();
+            direction = DIRECTION_REVERSE | DIRECTION_RIGHT;
 #endif
             break;
         case IRSTATUS_FRONT_RIGHT_EDGES:
-#if 1
+#if 0
             mcForwardBackward->brake();
 #else
+            mcForwardBackward->reverse(SPEED_PWM);
+            mcLeftRight->forward(LEFT_TURN_PWM);
+            delay(TURN_DELAY / 2);
+            mcForwardBackward->reverse();
+            direction = DIRECTION_REVERSE | DIRECTION_LEFT;
             //mcLeftRight->reverse(TURN_PWM);
             //mcForwardBackward->reverse();
 #endif
@@ -478,11 +485,10 @@ void loop()
     }
     if (!mcLeftRight->getBrakeStatus()) {
         if (mcLeftRight->getPwm() > 0) {
-            mcLeftRight->forward(mcLeftRight->getPwm() - 1);
-            //mcLeftRight->brake();
+            mcLeftRight->forward(mcLeftRight->getPwm() - 10);
         }
         else if (mcLeftRight->getPwm() < 0) {
-            mcLeftRight->forward(mcLeftRight->getPwm() + 1);
+            mcLeftRight->forward(mcLeftRight->getPwm() + 10);
         }
         else {
             mcLeftRight->brake();
