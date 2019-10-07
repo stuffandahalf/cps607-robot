@@ -1,20 +1,19 @@
 #include "MotorControl.h"
 
 // constants for the speed of sound
-#define SPEED_OF_SOUND_MpS 343
-#define SPEED_OF_SOUND_MMpS (SPEED_OF_SOUND_MpS / 1000)
+#define SPEED_OF_SOUND ((float)343 / 1000) /* mm/us */
 
 #define MOTOR_LA (10)
 #define MOTOR_LB (9)
 #define MOTOR_RA (6)
 #define MOTOR_RB (5)
 
-#define IR_SENSE_F (A0)
-#define IR_SENSE_R (A1)
+#define IR_SENSE_F (A5)
+#define IR_SENSE_R (A7)
 #define IR_SENSE_L (A2)
 
-#define DISTANCE_SENSE_TRIGGER  (7)
-#define DISTANCE_SENSE_ECHO     (8)
+#define DISTANCE_SENSE_TRIGGER  (A1)
+#define DISTANCE_SENSE_ECHO     (A0)
 
 #define SENSE_CLEAR     (0u)
 #define SENSE_IR_FRONT  (1 << 0)
@@ -31,10 +30,10 @@
 
 /* Macros to change the execution style */
 #define SERIAL_DEBUG
-//#define DONT_MOVE
+#define DONT_MOVE
 
 #ifdef SERIAL_DEBUG
-#define PRINT_SERIAL(...) Serial.print(__VA_ARGS__);
+#define PRINT_SERIAL(...) Serial.println(__VA_ARGS__);
 #else
 #define PRINT_SERIAL(...)
 #endif
@@ -60,18 +59,21 @@ uint8_t getIRSensorStatus()
     return state;
 }
 
+//s = d / t
+//d = s * t
+
 int16_t getDistance()
 {
     digitalWrite(DISTANCE_SENSE_TRIGGER, HIGH);
     delayMicroseconds(10);
     digitalWrite(DISTANCE_SENSE_TRIGGER, LOW);
     
-    unsigned long duration = pulseIn(DISTANCE_SENSE_ECHO, HIGH);
+    unsigned long duration = pulseIn(DISTANCE_SENSE_ECHO, HIGH) * 1000000;
     if (!duration) {
         return -1;
     }
     
-    int16_t distance = duration * SPEED_OF_SOUND_MMpS; // distance is now in millimeters
+    int16_t distance = duration * SPEED_OF_SOUND; // distance is now in millimeters
     
     return distance;
 }
@@ -89,6 +91,11 @@ void setup()
     pinMode(IR_SENSE_R, INPUT);
     pinMode(IR_SENSE_L, INPUT);
     
+    pinMode(DISTANCE_SENSE_TRIGGER, OUTPUT);
+    pinMode(DISTANCE_SENSE_ECHO, INPUT);
+    
+    digitalWrite(DISTANCE_SENSE_TRIGGER, LOW);
+    
 #ifndef DONT_MOVE
     leftMotor->forward(SPEED);
     rightMotor->forward(SPEED);
@@ -98,15 +105,18 @@ void setup()
 
 void loop()
 {
+    PRINT_SERIAL(getDistance());
+    
 #ifdef DONT_MOVE
     return;
 #endif
     
     int16_t distance = getDistance();
     uint8_t irStatus = getIRSensorStatus();
-    if ((irStatus & IR_SENSE_F) || distance >= 0) {
+    /*if ((irStatus & IR_SENSE_F) || distance >= 0) {
         
-    }
+    }*/
+    
     
     
     /*if (getIRSensorStatus()) {
