@@ -1,8 +1,26 @@
 #include "MotorControl.h"
 
+/* Macros to change the execution style */
+#define SERIAL_DEBUG
+#define DONT_MOVE
+//#define BOE_BOT
+
 // constants for the speed of sound
 #define SPEED_OF_SOUND ((float)343 / 1000) /* mm/us */
 
+#ifdef BOE_BOT
+#define MOTOR_LA ()
+#define MOTOR_LB ()
+#define MOTOR_RA ()
+#define MOTOR_RB ()
+
+#define IR_SENSE_F ()
+#define IR_SENSE_R ()
+#define IR_SENSE_L ()
+
+#define DISTANCE_SENSE_TRIGGER  ()
+#define DISTANCE_SENSE_ECHO     ()
+#else
 #define MOTOR_LA (10)
 #define MOTOR_LB (9)
 #define MOTOR_RA (6)
@@ -14,6 +32,7 @@
 
 #define DISTANCE_SENSE_TRIGGER  (A1)
 #define DISTANCE_SENSE_ECHO     (A0)
+#endif
 
 #define SENSE_CLEAR     (0u)
 #define SENSE_IR_FRONT  (1 << 0)
@@ -27,10 +46,6 @@
 #define SPEED (64)
 //#define SPEED (128)
 //#define SPEED (96)
-
-/* Macros to change the execution style */
-#define SERIAL_DEBUG
-#define DONT_MOVE
 
 #ifdef SERIAL_DEBUG
 #define PRINT_SERIAL(...) Serial.println(__VA_ARGS__);
@@ -58,9 +73,6 @@ uint8_t getIRSensorStatus()
     }
     return state;
 }
-
-//s = d / t
-//d = s * t
 
 int16_t getDistance()
 {
