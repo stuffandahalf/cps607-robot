@@ -25,9 +25,11 @@
 #define SENSE_IR_FRONT_RIGHT   (IR_STATUS_FRONT | IR_STATUS_RIGHT)
 #define SENSE_IR_OFF_TABLE     (IR_STATUS_FRONT | IR_STATUS_LEFT | IR_STATUS_RIGHT)
 
+#define SPEED (64)
+
 /* Macros to change the execution style */
 //#define SERIAL_DEBUG
-//#define DONT_MOVE
+#define DONT_MOVE
 
 #ifdef SERIAL_DEBUG
 #define PRINT_SERIAL(...) Serial.print(__VA_ARGS__);
@@ -44,13 +46,13 @@ inline bool inRange(T x, T a, T b) { return a <= x && x < b; }
 uint8_t getIRSensorStatus()
 {
     uint8_t state = SENSE_CLEAR;
-    if (digitalRead(IR_SENSE_F) {
+    if (digitalRead(IR_SENSE_F)) {
         state |= SENSE_IR_FRONT;
     }
-    if (digitalRead(IR_SENSE_L) {
+    if (digitalRead(IR_SENSE_L)) {
         state |= SENSE_IR_LEFT;
     }
-    if (digitalRead(IR_SENSE_R) {
+    if (digitalRead(IR_SENSE_R)) {
         state |= SENSE_IR_RIGHT;
     }
     return state;
@@ -86,8 +88,10 @@ void setup()
     pinMode(IR_SENSE_L, INPUT);
     
 #ifndef DONT_MOVE
-    leftMotor->forward(255);
-    rightMotor->forward(255);
+    //leftMotor->forward(255);
+    //rightMotor->forward(255);
+    leftMotor->forward(SPEED);
+    rightMotor->forward(SPEED);
 #endif
 }
 

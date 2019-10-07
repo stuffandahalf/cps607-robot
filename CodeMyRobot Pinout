@@ -1,0 +1,27 @@
+J1 [ GND, A1, A0, +5v ]
+
+P2 [ +9v, +9v, +9v, +9v, |, |, |, |, |, |, +, +, +, +9v, +9v ] (| = connected vertically, + connected vertically and horizontally)
+   [ +9v, +9v, +9v, +9v, |, |, |, |, |, |, +, +, +, GND, GND ]
+
+P3 [ +9v (out), +9v, +9v, +9v ] (input 9v)
+
+J4 [ +5v, A2, A3, GND ]
+
+J6 [ A7, A5, GND, +5v ]
+
+J7 [ A6, A4, GND, +5v ]
+
+J8 [ GND, +5v, D11, GND ]
+   [ GND, +5v, D11, GND ]
+
+J11 [ |, |, |, | ]
+    [ |, |, |, | ]
+
+J12 [ D2, D3, D4, GND ]
+    [ D2, D3, D4, GND ]
+
+J13 [ |, |, |, | ]
+    [ |, |, |, | ]
+
+J14 [ |, |, |, | ]
+    [ |, |, |, | ]
