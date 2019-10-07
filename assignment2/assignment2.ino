@@ -32,7 +32,7 @@
 
 #define DISTANCE_SENSE_TRIGGER  (A1)
 #define DISTANCE_SENSE_ECHO     (A0)
-#endif
+#endif // BOE_BOT
 
 #define SENSE_CLEAR     (0u)
 #define SENSE_IR_FRONT  (1 << 0)
@@ -112,6 +112,9 @@ void setup()
     leftMotor->forward(SPEED);
     rightMotor->forward(SPEED);
     //rightMotor->reverse(SPEED);
+#else
+    leftMotor->brake();
+    rightMotor->brake();
 #endif
 }
 
