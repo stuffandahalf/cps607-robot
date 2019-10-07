@@ -26,10 +26,12 @@
 #define SENSE_IR_OFF_TABLE     (IR_STATUS_FRONT | IR_STATUS_LEFT | IR_STATUS_RIGHT)
 
 #define SPEED (64)
+//#define SPEED (128)
+//#define SPEED (96)
 
 /* Macros to change the execution style */
-//#define SERIAL_DEBUG
-#define DONT_MOVE
+#define SERIAL_DEBUG
+//#define DONT_MOVE
 
 #ifdef SERIAL_DEBUG
 #define PRINT_SERIAL(...) Serial.print(__VA_ARGS__);
@@ -88,10 +90,9 @@ void setup()
     pinMode(IR_SENSE_L, INPUT);
     
 #ifndef DONT_MOVE
-    //leftMotor->forward(255);
-    //rightMotor->forward(255);
     leftMotor->forward(SPEED);
     rightMotor->forward(SPEED);
+    //rightMotor->reverse(SPEED);
 #endif
 }
 
@@ -101,8 +102,23 @@ void loop()
     return;
 #endif
     
+    int16_t distance = getDistance();
+    uint8_t irStatus = getIRSensorStatus();
+    if ((irStatus & IR_SENSE_F) || distance >= 0) {
+        
+    }
     
-    PRINT_SERIAL(getDistance());
+    
+    /*if (getIRSensorStatus()) {
+        leftMotor->brake();
+        rightMotor->brake();
+    }
+    else {
+        leftMotor->forward(SPEED);
+        rightMotor->forward(SPEED);
+    }*/
+    
+    //PRINT_SERIAL(getDistance());
     /*uint8_t sensorStatus;
     if ((sensorStatus = getSensorStatus()) != SENSE_CLEAR) {
         
