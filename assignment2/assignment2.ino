@@ -2,12 +2,8 @@
 #include "SonarSensor.h"
 
 /* Macros to change the execution style */
-#define SERIAL_DEBUG
+//#define SERIAL_DEBUG
 //#define DONT_MOVE
-
-// constants for the speed of sound
-//#define SPEED_OF_SOUND ((double)343 / 1000) /* mm/us */
-//#define SPEED_OF_SOUND (.343) /* mm/us */
 
 #define MOTOR_LA (10)
 #define MOTOR_LB (9)
@@ -26,9 +22,9 @@
 #define SENSE_IR_LEFT   (1 << 2)
 #define SENSE_IR_RIGHT  (1 << 3)
 
-#define SENSE_IR_FRONT_LEFT    (IR_STATUS_FRONT | IR_STATUS_LEFT)
-#define SENSE_IR_FRONT_RIGHT   (IR_STATUS_FRONT | IR_STATUS_RIGHT)
-#define SENSE_IR_OFF_TABLE     (IR_STATUS_FRONT | IR_STATUS_LEFT | IR_STATUS_RIGHT)
+#define SENSE_IR_FRONT_LEFT    (SENSE_IR_FRONT | SENSE_IR_LEFT)
+#define SENSE_IR_FRONT_RIGHT   (SENSE_IR_FRONT | SENSE_IR_RIGHT)
+#define SENSE_IR_OFF_TABLE     (SENSE_IR_FRONT | SENSE_IR_LEFT | SENSE_IR_RIGHT)
 
 #ifdef SERIAL_DEBUG
 #define SPEED (128)
@@ -47,6 +43,8 @@
 MotorControl *leftMotor;
 MotorControl *rightMotor;
 SonarSensor *sonarSensor;
+int16_t lSpeed;
+int16_t rSpeed;
 
 template <typename T>
 inline bool inRange(T x, T a, T b) { return a <= x && x < b; }
@@ -85,10 +83,12 @@ void setup()
     
     digitalWrite(DISTANCE_SENSE_TRIGGER, LOW);
     
+    lSpeed = SPEED;
+    rSpeed = SPEED;
+    
 #ifndef DONT_MOVE
-    leftMotor->forward(SPEED);
-    rightMotor->forward(SPEED);
-    //rightMotor->reverse(SPEED);
+    leftMotor->forward(lSpeed);
+    rightMotor->forward(rSpeed);
 #else
     leftMotor->brake();
     rightMotor->brake();
@@ -103,30 +103,51 @@ void loop()
     
     int16_t distance = sonarSensor->getDistance();
     uint8_t irStatus = getIRSensorStatus();
-    if ((irStatus & IR_SENSE_F) || inRange<long>(distance, 0, 150)) {
-        rightMotor->brake();
-        delay(7);
-        leftMotor->brake();
+    
+    // If an object is close, then go away from it just like if it was driving off the table
+    if (inRange<int16_t>(distance, 0, 150)) {
+        irStatus |= SENSE_IR_FRONT;
+    }
+    
+    if (irStatus != SENSE_CLEAR) {     // approaching table edge from diagonal
+        switch (irStatus) {
+        case SENSE_IR_FRONT:
+            if (lSpeed > 0) {
+                lSpeed *= -1;
+            }
+            rSpeed = SPEED;
+            break;
+        case SENSE_IR_RIGHT:
+            if (lSpeed > 0) {
+                lSpeed *= -1;
+                rSpeed = SPEED;
+            }
+            break;
+        case SENSE_IR_LEFT:
+            if (rSpeed > 0) {
+                rSpeed *= -1;
+            }
+            lSpeed = SPEED;
+            break;
+        case SENSE_IR_FRONT_LEFT:
+            lSpeed = 0;
+            rSpeed = SPEED;
+            break;
+        case SENSE_IR_FRONT_RIGHT:
+            rSpeed = 0;
+            lSpeed = SPEED;
+            break;
+        case SENSE_IR_OFF_TABLE:
+            lSpeed = 0;
+            rSpeed = 0;
+            break;
+        }
     }
     else {
-        rightMotor->forward(SPEED);
-        leftMotor->forward(SPEED);
+        lSpeed = SPEED;
+        rSpeed = SPEED;
     }
     
-    
-    
-    /*if (getIRSensorStatus()) {
-        leftMotor->brake();
-        rightMotor->brake();
-    }
-    else {
-        leftMotor->forward(SPEED);
-        rightMotor->forward(SPEED);
-    }*/
-    
-    //PRINT_SERIAL(getDistance());
-    /*uint8_t sensorStatus;
-    if ((sensorStatus = getSensorStatus()) != SENSE_CLEAR) {
-        
-    }*/
+    leftMotor->forward(lSpeed);
+    rightMotor->forward(rSpeed);
 }

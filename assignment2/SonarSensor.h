@@ -3,8 +3,7 @@
 
 #define SPEED_OF_SOUND (.343)
 
-class SonarSensor
-{
+class SonarSensor {
 private:
     byte trigger;
     byte echo;

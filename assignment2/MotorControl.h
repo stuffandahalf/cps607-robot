@@ -1,8 +1,7 @@
 #ifndef MOTORCONTROL_H
 #define MOTORCONTROL_H
 
-class MotorControl
-{
+class MotorControl {
 private:
     uint8_t outA;
     uint8_t outB;
@@ -14,8 +13,6 @@ private:
     //uint8_t kickstartDelay;
 
 public:
-
-
     MotorControl(uint8_t outA, uint8_t outB)
     {
         //this->kickstartPwm = KICKSTART_PWM;
