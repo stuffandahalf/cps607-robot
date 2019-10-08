@@ -112,23 +112,25 @@ void loop()
     if (irStatus != SENSE_CLEAR) {     // approaching table edge from diagonal
         switch (irStatus) {
         case SENSE_IR_FRONT:
+        case SENSE_IR_RIGHT:
             if (lSpeed > 0) {
                 lSpeed *= -1;
             }
             rSpeed = SPEED;
             break;
-        case SENSE_IR_RIGHT:
+        /*case SENSE_IR_RIGHT:
             if (lSpeed > 0) {
                 lSpeed *= -1;
                 rSpeed = SPEED;
             }
-            break;
+            break;*/
         case SENSE_IR_LEFT:
             if (rSpeed > 0) {
                 rSpeed *= -1;
             }
             lSpeed = SPEED;
             break;
+            
         case SENSE_IR_FRONT_LEFT:
             lSpeed = 0;
             rSpeed = SPEED;
@@ -137,6 +139,7 @@ void loop()
             rSpeed = 0;
             lSpeed = SPEED;
             break;
+            
         case SENSE_IR_OFF_TABLE:
             lSpeed = 0;
             rSpeed = 0;
