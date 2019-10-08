@@ -1,38 +1,25 @@
 #include "MotorControl.h"
+#include "SonarSensor.h"
 
 /* Macros to change the execution style */
 #define SERIAL_DEBUG
-#define DONT_MOVE
-//#define BOE_BOT
+//#define DONT_MOVE
 
 // constants for the speed of sound
-#define SPEED_OF_SOUND ((float)343 / 1000) /* mm/us */
+//#define SPEED_OF_SOUND ((double)343 / 1000) /* mm/us */
+//#define SPEED_OF_SOUND (.343) /* mm/us */
 
-#ifdef BOE_BOT
-#define MOTOR_LA ()
-#define MOTOR_LB ()
-#define MOTOR_RA ()
-#define MOTOR_RB ()
-
-#define IR_SENSE_F ()
-#define IR_SENSE_R ()
-#define IR_SENSE_L ()
-
-#define DISTANCE_SENSE_TRIGGER  ()
-#define DISTANCE_SENSE_ECHO     ()
-#else
 #define MOTOR_LA (10)
 #define MOTOR_LB (9)
 #define MOTOR_RA (6)
 #define MOTOR_RB (5)
 
-#define IR_SENSE_F (A5)
-#define IR_SENSE_R (A7)
+#define IR_SENSE_F (11)
+#define IR_SENSE_R (A4)
 #define IR_SENSE_L (A2)
 
 #define DISTANCE_SENSE_TRIGGER  (A1)
 #define DISTANCE_SENSE_ECHO     (A0)
-#endif // BOE_BOT
 
 #define SENSE_CLEAR     (0u)
 #define SENSE_IR_FRONT  (1 << 0)
@@ -43,7 +30,11 @@
 #define SENSE_IR_FRONT_RIGHT   (IR_STATUS_FRONT | IR_STATUS_RIGHT)
 #define SENSE_IR_OFF_TABLE     (IR_STATUS_FRONT | IR_STATUS_LEFT | IR_STATUS_RIGHT)
 
+#ifdef SERIAL_DEBUG
+#define SPEED (128)
+#else
 #define SPEED (64)
+#endif
 //#define SPEED (128)
 //#define SPEED (96)
 
@@ -55,6 +46,7 @@
 
 MotorControl *leftMotor;
 MotorControl *rightMotor;
+SonarSensor *sonarSensor;
 
 template <typename T>
 inline bool inRange(T x, T a, T b) { return a <= x && x < b; }
@@ -74,22 +66,6 @@ uint8_t getIRSensorStatus()
     return state;
 }
 
-int16_t getDistance()
-{
-    digitalWrite(DISTANCE_SENSE_TRIGGER, HIGH);
-    delayMicroseconds(10);
-    digitalWrite(DISTANCE_SENSE_TRIGGER, LOW);
-    
-    unsigned long duration = pulseIn(DISTANCE_SENSE_ECHO, HIGH) * 1000000;
-    if (!duration) {
-        return -1;
-    }
-    
-    int16_t distance = duration * SPEED_OF_SOUND; // distance is now in millimeters
-    
-    return distance;
-}
-
 void setup()
 {
 #ifdef SERIAL_DEBUG
@@ -98,6 +74,7 @@ void setup()
     
     leftMotor = new MotorControl(MOTOR_LA, MOTOR_LB);
     rightMotor = new MotorControl(MOTOR_RB, MOTOR_RA);
+    sonarSensor = new SonarSensor(DISTANCE_SENSE_TRIGGER, DISTANCE_SENSE_ECHO);
     
     pinMode(IR_SENSE_F, INPUT);
     pinMode(IR_SENSE_R, INPUT);
@@ -120,17 +97,21 @@ void setup()
 
 void loop()
 {
-    PRINT_SERIAL(getDistance());
-    
 #ifdef DONT_MOVE
     return;
 #endif
     
-    int16_t distance = getDistance();
+    int16_t distance = sonarSensor->getDistance();
     uint8_t irStatus = getIRSensorStatus();
-    /*if ((irStatus & IR_SENSE_F) || distance >= 0) {
-        
-    }*/
+    if ((irStatus & IR_SENSE_F) || inRange<long>(distance, 0, 150)) {
+        rightMotor->brake();
+        delay(7);
+        leftMotor->brake();
+    }
+    else {
+        rightMotor->forward(SPEED);
+        leftMotor->forward(SPEED);
+    }
     
     
     
