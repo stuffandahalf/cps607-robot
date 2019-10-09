@@ -26,7 +26,7 @@ public:
         delayMicroseconds(10);
         digitalWrite(this->trigger, LOW);
         
-        unsigned long duration = pulseIn(this->echo, HIGH);
+        unsigned long duration = pulseIn(this->echo, HIGH, 500000);
         if (!duration) {
             return -1;
         }

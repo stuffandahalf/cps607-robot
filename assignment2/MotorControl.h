@@ -4,7 +4,9 @@
 //#define USE_KICKSTART
 
 #ifdef USE_KICKSTART
-#define KICKSTART_PWM (128)
+//#define KICKSTART_PWM (96)
+#define KICKSTART_PWM (192)
+#define KICKSTART_DELAY (10)
 #endif
 
 class MotorControl {
@@ -58,7 +60,7 @@ public:
 #ifdef USE_KICKSTART
         analogWrite(this->outA, KICKSTART_PWM);
         //delay(KICKSTART_DELAY);
-        delayMicroseconds(100);
+        delay(KICKSTART_DELAY);
 #endif
         analogWrite(this->outA, pwm & 0xFF);
         this->brakeStatus = false;
@@ -75,7 +77,7 @@ public:
         digitalWrite(this->outA, LOW);
 #ifdef USE_KICKSTART
         analogWrite(this->outB, KICKSTART_PWM);
-        delayMicroseconds(100);
+        delay(KICKSTART_DELAY);
 #endif
         analogWrite(this->outB, pwm & 0xFF);
         this->brakeStatus = false;

@@ -38,15 +38,20 @@
 #define DIRECTION_RIGHT (2)
 
 #ifdef SERIAL_DEBUG
-#define RSPEED (128)
+#define LSPEED (128)
 #else
-//#define RSPEED (65) /* reduced battery */
-//#define RSPEED (55) /* Full battery */
-#define RSPEED (58) /* Full battery */
+//#define LSPEED (56) /* full battery */
+#define LSPEED (58)
 #endif
-#define LSPEED (RSPEED - 7)
-//#define REVERSE_OFFSET (10)
-#define REVERSE_OFFSET (15)
+//#define RSPEED (65) /* reduced battery */
+//define RSPEED (60)
+//#define RSPEED (55) /* Full battery */
+#define RSPEED (LSPEED) /* Full battery */
+//#define LSPEED (RSPEED - 7)
+//#define REVERSE_OFFSET (15)
+#define REVERSE_OFFSET (25)
+
+#define ROTATION_PWM (65)
 
 #ifdef SERIAL_DEBUG
 #define PRINT_SERIAL(...) Serial.println(__VA_ARGS__);
@@ -130,11 +135,11 @@ void setup()
 
 void loop()
 {
-    /*Serial.print("LEFT: ");
+    Serial.print("LEFT: ");
     Serial.print(lSonarSensor->getDistance());
     Serial.print("\tRIGHT: ");
     Serial.print(rSonarSensor->getDistance());
-    Serial.println();*/
+    Serial.println();
     
 #ifdef DONT_MOVE
     return;
@@ -146,6 +151,7 @@ void loop()
     int16_t rDistance = rSonarSensor->getDistance();
 #endif
     uint8_t irStatus = getIRSensorStatus();
+    int thisDelay = 0;
     
 #ifdef USE_DISTANCE
     PRINT_SERIAL(distance);
@@ -164,7 +170,7 @@ void loop()
         int16_t lSpeed;
         int16_t rSpeed;
         
-        if (lDistance < 50 || rDistance < 50) {
+        if (lDistance < 50 || rDistance < 50 || (getIRSensorStatus() & SENSE_IR_FRONT)) {
             leftMotor->reverse(LSPEED + REVERSE_OFFSET);
             rightMotor->reverse(RSPEED + REVERSE_OFFSET);
             delay(SONAR_SEQUENCE_DELAY);
@@ -182,6 +188,7 @@ void loop()
             rSpeed = RSPEED;
             lastSensed = SENSE_IR_FRONT_RIGHT;
         }
+        
         leftMotor->forward(lSpeed);
         rightMotor->forward(rSpeed);
         delay(SONAR_SEQUENCE_DELAY);
@@ -224,10 +231,12 @@ void loop()
         case SENSE_IR_RIGHT:
             rSpeed = 0;
             lSpeed = (LSPEED + REVERSE_OFFSET) * -1;
+            thisDelay = 75;
             break;
         case SENSE_IR_LEFT:
             rSpeed = (RSPEED + REVERSE_OFFSET) * -1;
             lSpeed = 0;
+            thisDelay = 75;
             break;
             
         case SENSE_IR_FRONT_LEFT:
@@ -253,4 +262,6 @@ void loop()
 
     leftMotor->forward(lSpeed);
     rightMotor->forward(rSpeed);
+    delay(thisDelay);
+    thisDelay = 0;
 }
