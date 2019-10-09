@@ -14,8 +14,11 @@
 #define IR_SENSE_R (A4)
 #define IR_SENSE_L (A2)
 
-#define DISTANCE_SENSE_TRIGGER  (A1)
-#define DISTANCE_SENSE_ECHO     (A0)
+#define DISTANCE_SENSE_L_TRIGGER  (A1)
+#define DISTANCE_SENSE_L_ECHO     (A0)
+#define DISTANCE_SENSE_R_TRIGGER  (3)
+#define DISTANCE_SENSE_R_ECHO     (4)
+
 
 #define SENSE_CLEAR     (0u)
 #define SENSE_IR_FRONT  (1 << 0)
@@ -40,9 +43,13 @@
 #define PRINT_SERIAL(...)
 #endif
 
+const byte vout[] = { 2 };
+const unsigned int vout_count = sizeof(vout) / sizeof(byte);
+
 MotorControl *leftMotor;
 MotorControl *rightMotor;
-SonarSensor *sonarSensor;
+SonarSensor *lSonarSensor;
+SonarSensor *rSonarSensor;
 int16_t lSpeed;
 int16_t rSpeed;
 
@@ -72,16 +79,22 @@ void setup()
     
     leftMotor = new MotorControl(MOTOR_LA, MOTOR_LB);
     rightMotor = new MotorControl(MOTOR_RB, MOTOR_RA);
-    sonarSensor = new SonarSensor(DISTANCE_SENSE_TRIGGER, DISTANCE_SENSE_ECHO);
+    lSonarSensor = new SonarSensor(DISTANCE_SENSE_L_TRIGGER, DISTANCE_SENSE_L_ECHO);
+    rSonarSensor = new SonarSensor(DISTANCE_SENSE_R_TRIGGER, DISTANCE_SENSE_R_ECHO);
     
     pinMode(IR_SENSE_F, INPUT);
     pinMode(IR_SENSE_R, INPUT);
     pinMode(IR_SENSE_L, INPUT);
     
-    pinMode(DISTANCE_SENSE_TRIGGER, OUTPUT);
-    pinMode(DISTANCE_SENSE_ECHO, INPUT);
+    /*pinMode(DISTANCE_SENSE_TRIGGER, OUTPUT);
+    pinMode(DISTANCE_SENSE_ECHO, INPUT);*/
     
-    digitalWrite(DISTANCE_SENSE_TRIGGER, LOW);
+    //digitalWrite(DISTANCE_SENSE_TRIGGER, LOW);
+    
+    for (unsigned int i = 0; i < vout_count; i++) {
+        pinMode(vout[i], OUTPUT);
+        digitalWrite(vout[i], HIGH);
+    }
     
     lSpeed = SPEED;
     rSpeed = SPEED;
@@ -97,9 +110,17 @@ void setup()
 
 void loop()
 {
+    Serial.print("LEFT: ");
+    Serial.print(lSonarSensor->getDistance());
+    Serial.print("\tRIGHT: ");
+    Serial.print(rSonarSensor->getDistance());
+    Serial.println();
+    
 #ifdef DONT_MOVE
     return;
 #endif
+
+#if 0
     
     int16_t distance = sonarSensor->getDistance();
     uint8_t irStatus = getIRSensorStatus();
@@ -153,4 +174,5 @@ void loop()
     
     leftMotor->forward(lSpeed);
     rightMotor->forward(rSpeed);
+#endif
 }
