@@ -4,6 +4,7 @@
 /* Macros to change the execution style */
 //#define SERIAL_DEBUG
 //#define DONT_MOVE
+#define USE_DISTANCE
 
 #define MOTOR_LA (10)
 #define MOTOR_LB (9)
@@ -19,6 +20,8 @@
 #define DISTANCE_SENSE_R_TRIGGER  (3)
 #define DISTANCE_SENSE_R_ECHO     (4)
 
+#define SONAR_DISTANCE (250)
+#define SONAR_SEQUENCE_DELAY (350)
 
 #define SENSE_CLEAR     (0u)
 #define SENSE_IR_FRONT  (1 << 0)
@@ -36,9 +39,8 @@
 #ifdef SERIAL_DEBUG
 #define RSPEED (128)
 #else
-//#define RSPEED (55)
-//#define RSPEED (60)
-#define RSPEED (65)
+//#define RSPEED (65) /* reduced battery */
+#define RSPEED (50) /* Full battery */
 #endif
 #define LSPEED (RSPEED - 7)
 //#define REVERSE_OFFSET (10)
@@ -141,7 +143,7 @@ void loop()
     PRINT_SERIAL(distance);
     
     // If an object is close, then go away from it just like if it was driving off the table
-    if (inRange<int16_t>(lDistance, 0, 150) || inRange<int16_t>(rDistance, 0, 150)) {
+    /*if (inRange<int16_t>(lDistance, 0, SONAR_DISTANCE) || inRange<int16_t>(rDistance, 0, SONAR_DISTANCE)) {
         irStatus |= SENSE_IR_FRONT;
         if (lDistance < rDistance) {
             irStatus |= SENSE_IR_LEFT;
@@ -149,7 +151,27 @@ void loop()
         else if (lDistance > rDistance) {
             irStatus |= SENSE_IR_RIGHT;
         }
+    }*/
+    while (inRange<int16_t>((lDistance = lSonarSensor->getDistance()), 0, SONAR_DISTANCE) || inRange<int16_t>((rDistance = rSonarSensor->getDistance()), 0, SONAR_DISTANCE)) {
+        int16_t lSpeed;
+        int16_t rSpeed;
+        if (lDistance < rDistance) {
+            lSpeed = LSPEED;
+            rSpeed = (RSPEED + REVERSE_OFFSET) * -1;
+            lastSensed = SENSE_IR_FRONT_LEFT;
+        }
+        else /*if (lDistance > rDistance)*/ {
+            lSpeed = (LSPEED + REVERSE_OFFSET) * -1;
+            rSpeed = RSPEED;
+            lastSensed = SENSE_IR_FRONT_RIGHT;
+        }
+        leftMotor->forward(lSpeed);
+        rightMotor->forward(rSpeed);
+        delay(SONAR_SEQUENCE_DELAY);
     }
+    
+    leftMotor->forward(lSpeed);
+    rightMotor->forward(rSpeed);
 #endif
     
     if (irStatus != SENSE_CLEAR) {     // approaching table edge from diagonal
@@ -177,8 +199,10 @@ void loop()
             case SENSE_IR_FRONT:
             case SENSE_IR_OFF_TABLE:
             default:
-                lSpeed = 0;
-                rSpeed = 0;
+                /*lSpeed = 0;
+                rSpeed = 0;*/
+                lSpeed = (LSPEED + REVERSE_OFFSET) * -1;
+                rSpeed = RSPEED;
                 break;
             }
             break;
@@ -205,7 +229,7 @@ void loop()
             rSpeed = 0;
             break;
         }
-    lastSensed = irStatus;
+        lastSensed = irStatus;
     }
     else {
         lSpeed = LSPEED;
