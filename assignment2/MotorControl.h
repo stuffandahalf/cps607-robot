@@ -74,6 +74,10 @@ public:
     {
         digitalWrite(this->outA, HIGH);
         digitalWrite(this->outB, HIGH);
+        /*this->forward(this->pwm * -1);
+        delayMicroseconds(100);
+        digitalWrite(this->outA, LOW);
+        digitalWrite(this->outB, LOW);*/
         this->brakeStatus = true;
     }
     
