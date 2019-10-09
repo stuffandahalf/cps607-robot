@@ -1,6 +1,12 @@
 #ifndef MOTORCONTROL_H
 #define MOTORCONTROL_H
 
+//#define USE_KICKSTART
+
+#ifdef USE_KICKSTART
+#define KICKSTART_PWM (128)
+#endif
+
 class MotorControl {
 private:
     uint8_t outA;
@@ -49,8 +55,11 @@ public:
         this->pwm = pwm & 0xFF;
         
         digitalWrite(this->outB, LOW);
-        /*analogWrite(this->outA, KICKSTART_PWM);
-        delay(KICKSTART_DELAY);*/
+#ifdef USE_KICKSTART
+        analogWrite(this->outA, KICKSTART_PWM);
+        //delay(KICKSTART_DELAY);
+        delayMicroseconds(100);
+#endif
         analogWrite(this->outA, pwm & 0xFF);
         this->brakeStatus = false;
     }
@@ -64,8 +73,10 @@ public:
         }
         this->pwm = (pwm & 0xFF) * -1;
         digitalWrite(this->outA, LOW);
-        /*analogWrite(this->outB, KICKSTART_PWM);
-        delay(KICKSTART_DELAY);*/
+#ifdef USE_KICKSTART
+        analogWrite(this->outB, KICKSTART_PWM);
+        delayMicroseconds(100);
+#endif
         analogWrite(this->outB, pwm & 0xFF);
         this->brakeStatus = false;
     }

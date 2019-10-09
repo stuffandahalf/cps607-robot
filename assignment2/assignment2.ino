@@ -21,6 +21,7 @@
 #define DISTANCE_SENSE_R_ECHO     (4)
 
 #define SONAR_DISTANCE (250)
+//#define SONAR_DISTANCE (350)
 #define SONAR_SEQUENCE_DELAY (350)
 
 #define SENSE_CLEAR     (0u)
@@ -40,7 +41,8 @@
 #define RSPEED (128)
 #else
 //#define RSPEED (65) /* reduced battery */
-#define RSPEED (50) /* Full battery */
+//#define RSPEED (55) /* Full battery */
+#define RSPEED (58) /* Full battery */
 #endif
 #define LSPEED (RSPEED - 7)
 //#define REVERSE_OFFSET (10)
@@ -52,6 +54,7 @@
 #define PRINT_SERIAL(...)
 #endif
 
+// pins used for +5v output
 const byte vout[] = { 2 };
 const unsigned int vout_count = sizeof(vout) / sizeof(byte);
 
@@ -110,6 +113,11 @@ void setup()
     rSpeed = RSPEED;
     
 #ifndef DONT_MOVE
+    /*leftMotor->reverse(lSpeed + REVERSE_OFFSET);
+    rightMotor->reverse(rSpeed + REVERSE_OFFSET);
+    
+    delay(750);*/
+
     leftMotor->forward(lSpeed);
     rightMotor->forward(rSpeed);
 #else
@@ -155,6 +163,15 @@ void loop()
     while (inRange<int16_t>((lDistance = lSonarSensor->getDistance()), 0, SONAR_DISTANCE) || inRange<int16_t>((rDistance = rSonarSensor->getDistance()), 0, SONAR_DISTANCE)) {
         int16_t lSpeed;
         int16_t rSpeed;
+        
+        if (lDistance < 50 || rDistance < 50) {
+            leftMotor->reverse(LSPEED + REVERSE_OFFSET);
+            rightMotor->reverse(RSPEED + REVERSE_OFFSET);
+            delay(SONAR_SEQUENCE_DELAY);
+            leftMotor->brake();
+            rightMotor->brake();
+        }
+            
         if (lDistance < rDistance) {
             lSpeed = LSPEED;
             rSpeed = (RSPEED + REVERSE_OFFSET) * -1;
@@ -199,8 +216,6 @@ void loop()
             case SENSE_IR_FRONT:
             case SENSE_IR_OFF_TABLE:
             default:
-                /*lSpeed = 0;
-                rSpeed = 0;*/
                 lSpeed = (LSPEED + REVERSE_OFFSET) * -1;
                 rSpeed = RSPEED;
                 break;
