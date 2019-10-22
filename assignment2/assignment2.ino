@@ -41,7 +41,9 @@
 #define LSPEED (128)
 #else
 //#define LSPEED (56) /* full battery */
-#define LSPEED (58)
+//#define LSPEED (58)
+//#define LSPEED (63)
+#define LSPEED (67)
 #endif
 //#define RSPEED (65) /* reduced battery */
 //define RSPEED (60)
@@ -50,8 +52,6 @@
 //#define LSPEED (RSPEED - 7)
 //#define REVERSE_OFFSET (15)
 #define REVERSE_OFFSET (25)
-
-#define ROTATION_PWM (65)
 
 #ifdef SERIAL_DEBUG
 #define PRINT_SERIAL(...) Serial.println(__VA_ARGS__);
@@ -73,6 +73,12 @@ uint8_t lastSensed;
 
 template <typename T>
 inline bool inRange(T x, T a, T b) { return a <= x && x < b; }
+
+// return the battery health as a percent
+inline uint8_t getBatteryStatus()
+{
+    return 100;
+}
 
 uint8_t getIRSensorStatus()
 {
@@ -135,11 +141,11 @@ void setup()
 
 void loop()
 {
-    Serial.print("LEFT: ");
+    /*Serial.print("LEFT: ");
     Serial.print(lSonarSensor->getDistance());
     Serial.print("\tRIGHT: ");
     Serial.print(rSonarSensor->getDistance());
-    Serial.println();
+    Serial.println();*/
     
 #ifdef DONT_MOVE
     return;
@@ -147,8 +153,8 @@ void loop()
 
 
 #ifdef USE_DISTANCE
-    int16_t lDistance = lSonarSensor->getDistance();
-    int16_t rDistance = rSonarSensor->getDistance();
+    int16_t lDistance;// = lSonarSensor->getDistance();
+    int16_t rDistance;// = rSonarSensor->getDistance();
 #endif
     uint8_t irStatus = getIRSensorStatus();
     int thisDelay = 0;
@@ -199,6 +205,8 @@ void loop()
 #endif
     
     if (irStatus != SENSE_CLEAR) {     // approaching table edge from diagonal
+        leftMotor->brake();
+        rightMotor->brake();
         switch (irStatus) {
         case SENSE_IR_FRONT:
             /*if (lastSensed & SENSE_IR_LEFT) {
