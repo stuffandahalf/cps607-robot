@@ -1,4 +1,9 @@
 //#define SERIAL_DEBUG
+#define USE_EDGE
+#define USE_DISTANCE
+#define USE_DELAY
+//#define USE_LED
+//#define USE_BATTERY_SENSE
 
 #include "MotorControl.h"
 #include "SonarSensor.h"
@@ -17,9 +22,12 @@
 #define DISTANCE_SENSE_R_TRIGGER  (3)
 #define DISTANCE_SENSE_R_ECHO     (4)
 
-#define BASE_SPEED  (52)
-#define R_SPEED     (BASE_SPEED)
-#define L_SPEED     (BASE_SPEED + 12)
+#define BATTERY_SENSE (A6)
+
+//#define BASE_SPEED(x)  (52 + (100 - x) / (4 + 4 * (x / 100)))
+#define BASE_SPEED(x)  (54)
+#define R_SPEED(x)  (BASE_SPEED(x))
+#define L_SPEED(x)  (BASE_SPEED(x) + 10)
 
 #define IR_STATUS_CLEAR (0)
 #define IR_STATUS_F     (1 << 0)
@@ -31,6 +39,11 @@
 
 #define SONAR_DISTANCE  (250)
 #define SONAR_SEQUENCE_DELAY (350)
+
+#define TURN_DELAY (75)
+
+#define DIRECTION_LEFT (1)
+#define DIRECTION_RIGHT (2)
 
 #ifdef SERIAL_DEBUG
 #define SERIAL_PRINT(...) Serial.print(__VA_ARGS__)
@@ -69,7 +82,19 @@ inline uint8_t getIRStatus()
 }
 
 template <typename T>
-inline bool inRange(T x, T a, T b) {  }
+inline bool inRange(T x, T a, T b) { return a <= x && x < b; }
+
+inline int getBatteryStatus()
+{
+#ifdef USE_BATTERY_SENSE
+    int batteryStatus = analogRead(BATTERY_SENSE);
+    
+    return batteryStatus;
+#else
+    //return 59;
+    return 34;
+#endif
+}
 
 void setup()
 {
@@ -93,31 +118,49 @@ void setup()
         digitalWrite(vout[i], HIGH);
     }
     
+#ifdef USE_LED
     pinMode(13, OUTPUT);
+#endif
+#ifdef USE_BATTERY_SENSE
+    pinMode(BATTERY_SENSE, INPUT);
+#endif
 }
 
 void loop()
 {
+#ifdef USE_EDGE
     uint8_t irStatus;
     if ((irStatus = getIRStatus())) {
-        int16_t lSpeed = L_SPEED;
-        int16_t rSpeed = R_SPEED;
+        int16_t lSpeed = L_SPEED(getBatteryStatus());
+        int16_t rSpeed = R_SPEED(getBatteryStatus());
+#ifdef USE_DELAY
+        int16_t turnDelay = 0;
+#endif
         
         switch (irStatus) {
         case IR_STATUS_F:
             rSpeed *= -1;
+#ifdef USE_DELAY
+            turnDelay = TURN_DELAY;
+#endif
             break;
         case IR_STATUS_FR:
-            rSpeed *= -1;
+            rSpeed = 0;
             // fall through
         case IR_STATUS_R:
             lSpeed *= -1;
+#ifdef USE_DELAY
+            turnDelay = TURN_DELAY;
+#endif
             break;
         case IR_STATUS_FL:
             lSpeed = 0;
             // fall through
         case IR_STATUS_L:
             rSpeed *= -1;
+#ifdef USE_DELAY
+            turnDelay = TURN_DELAY;
+#endif
             break;
         case IR_STATUS_ALL:
             lSpeed = 0;
@@ -135,59 +178,83 @@ void loop()
         
         leftMotor->forward(lSpeed);
         rightMotor->forward(rSpeed);
+#ifdef USE_DELAY
+        delay(turnDelay);
+#endif
         
         return;
     }
+#endif
     
+#ifdef USE_DISTANCE
     bool distanceAffected = false;
     
-    //int16_t lDistance;
-    //int16_t rDistance;
+    int16_t lDistance;
+    int16_t rDistance;
     
-    int16_t lDistance = leftSonar->getDistance();
-    int16_t rDistance = rightSonar->getDistance();
+    //int16_t lDistance = leftSonar->getDistance();
+    //int16_t rDistance = rightSonar->getDistance();
 
     SERIAL_PRINT(lDistance);
     SERIAL_PRINT('\t');
     SERIAL_PRINTLN(rDistance);
     
-    while (inRange<int16_t>(lDistance, 0, SONAR_DISTANCE) ||
-        inRange<int16_t>(rDistance, 0, SONAR_DISTANCE)) {
+    while (inRange<int16_t>((lDistance = leftSonar->getDistance()), 0, SONAR_DISTANCE) ||
+        inRange<int16_t>((rDistance = rightSonar->getDistance()), 0, SONAR_DISTANCE)) {
+#ifdef USE_LED
         digitalWrite(13, !digitalRead(13));
+#endif
             
         distanceAffected = true;
             
-        int16_t lSpeed = L_SPEED;
-        int16_t rSpeed = R_SPEED;
+        int16_t lSpeed = L_SPEED(getBatteryStatus());
+        int16_t rSpeed = R_SPEED(getBatteryStatus());
+#ifdef USE_DELAY
+        int16_t turnDelay = 0;
+#endif
         
-        /*if (lDistance < 50 || rDistance < 50 || (getIRSensorStatus() & SENSE_IR_FRONT)) {
-            leftMotor->forward(L_SPEED * -1);
-            rightMotor->forward(R_SPEED * -1);
-            delay(SONAR_SEQUENCE_DELAY);
+        if (lDistance < 100 || rDistance < 100 /*|| (getIRSensorStatus() & SENSE_IR_FRONT)*/) {
+            leftMotor->forward(L_SPEED(getBatteryStatus()) * -1);
+            rightMotor->forward(R_SPEED(getBatteryStatus()) * -1);
+            //delay(SONAR_SEQUENCE_DELAY);
+            delay(100);
             leftMotor->brake();
             rightMotor->brake();
-        }*/
-                    
-        if (lDistance < rDistance) {
+        }
+        
+        if (/*lDistance != -1 &&*/ lDistance < rDistance) {
             //lSpeed = 0;
             rSpeed *= -1;
+#ifdef USE_DELAY
+            turnDelay = TURN_DELAY;
+#endif
         }
-        else /*if (lDistance > rDistance)*/ {
+        else /*if (rDistance != -1 && lDistance > rDistance)*/ {
             //rSpeed = 0;
             lSpeed *= -1;
+#ifdef USE_DELAY
+            turnDelay = TURN_DELAY;
+#endif
         }
         
         leftMotor->forward(lSpeed);
         rightMotor->forward(rSpeed);
+//#ifdef USE_DELAY
+        //delay(turnDelay * 2);
+        delay(500);
+//#endif
         
-        lDistance = leftSonar->getDistance();
-        rDistance = rightSonar->getDistance();
+        //lDistance = leftSonar->getDistance();
+        //rDistance = rightSonar->getDistance();
     }
     
     if (distanceAffected) {
         return;
     }
+#endif
     
-    leftMotor->forward(L_SPEED);
-    rightMotor->forward(R_SPEED);
+
+    leftMotor->forward(L_SPEED(getBatteryStatus()));
+    rightMotor->forward(R_SPEED(getBatteryStatus()));
+
 }
