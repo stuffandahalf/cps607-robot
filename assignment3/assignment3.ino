@@ -26,7 +26,7 @@
 #define DISTANCE_SENSE_R_TRIGGER  (3)
 #define DISTANCE_SENSE_R_ECHO     (4)
 
-#define BATTERY_SENSE (A6)
+#define BATTERY_SENSE (A2)
 
 //#define BASE_SPEED(x)  (52 + (100 - x) / (4 + 4 * (x / 100)))
 #define BASE_SPEED(x)  (54)
@@ -91,9 +91,7 @@ inline bool inRange(T x, T a, T b) { return a <= x && x < b; }
 inline int getBatteryStatus()
 {
 #ifdef USE_BATTERY_SENSE
-    int batteryStatus = analogRead(BATTERY_SENSE);
-    
-    return batteryStatus;
+    return map(analogRead(BATTERY_SENSE), 457, 589, 0, 100);
 #else
     //return 59;
     return 34;
@@ -116,6 +114,9 @@ void setup()
     pinMode(IR_SENSE_F, INPUT);
     pinMode(IR_SENSE_R, INPUT);
     pinMode(IR_SENSE_L, INPUT);
+    
+    pinMode(LINE_SENSE_F, INPUT);
+    pinMode(LINE_SENSE_R, INPUT);
     
     for (int i = 0; i < vout_count; i++) {
         pinMode(vout[i], OUTPUT);
@@ -190,14 +191,15 @@ void loop()
     }
 #endif
     
+#ifdef USE_LINE
+    
+#endif
+    
 #ifdef USE_DISTANCE
     bool distanceAffected = false;
     
     int16_t lDistance;
     int16_t rDistance;
-    
-    //int16_t lDistance = leftSonar->getDistance();
-    //int16_t rDistance = rightSonar->getDistance();
 
     SERIAL_PRINT(lDistance);
     SERIAL_PRINT('\t');
@@ -217,10 +219,9 @@ void loop()
         int16_t turnDelay = 0;
 #endif
         
-        if (lDistance < 100 || rDistance < 100 /*|| (getIRSensorStatus() & SENSE_IR_FRONT)*/) {
+        if (lDistance < 100 || rDistance < 100) {
             leftMotor->forward(L_SPEED(getBatteryStatus()) * -1);
             rightMotor->forward(R_SPEED(getBatteryStatus()) * -1);
-            //delay(SONAR_SEQUENCE_DELAY);
             delay(100);
             leftMotor->brake();
             rightMotor->brake();
@@ -243,13 +244,7 @@ void loop()
         
         leftMotor->forward(lSpeed);
         rightMotor->forward(rSpeed);
-//#ifdef USE_DELAY
-        //delay(turnDelay * 2);
         delay(500);
-//#endif
-        
-        //lDistance = leftSonar->getDistance();
-        //rDistance = rightSonar->getDistance();
     }
     
     if (distanceAffected) {
