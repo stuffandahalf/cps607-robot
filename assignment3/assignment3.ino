@@ -1,10 +1,11 @@
+//#define DONT_MOVE
 //#define SERIAL_DEBUG
-#define USE_EDGE
+/*#define USE_EDGE
 #define USE_DISTANCE
 #define USE_LINE
-#define USE_DELAY
+#define USE_DELAY*/
 //#define USE_LED
-//#define USE_BATTERY_SENSE
+#define USE_BATTERY_SENSE
 
 #include "MotorControl.h"
 #include "SonarSensor.h"
@@ -29,7 +30,9 @@
 #define BATTERY_SENSE (A2)
 
 //#define BASE_SPEED(x)  (52 + (100 - x) / (4 + 4 * (x / 100)))
-#define BASE_SPEED(x)  (54)
+//#define BASE_SPEED(x)  (54)
+//#define BASE_SPEED(x)  (54 + sq(100 - (x)) * 50)
+#define BASE_SPEED(x)  (54 + (100 - x) * 20 / 100)
 #define R_SPEED(x)  (BASE_SPEED(x))
 #define L_SPEED(x)  (BASE_SPEED(x) + 10)
 
@@ -91,7 +94,9 @@ inline bool inRange(T x, T a, T b) { return a <= x && x < b; }
 inline int getBatteryStatus()
 {
 #ifdef USE_BATTERY_SENSE
-    return map(analogRead(BATTERY_SENSE), 457, 589, 0, 100);
+    //return map(analogRead(BATTERY_SENSE), 457, 589, 0, 100);
+    //return analogRead(BATTERY_SENSE);
+    return map(analogRead(BATTERY_SENSE), 150, 650, 0, 100);
 #else
     //return 59;
     return 34;
@@ -133,6 +138,15 @@ void setup()
 
 void loop()
 {
+    //SERIAL_PRINTLN(getBatteryStatus());
+    SERIAL_PRINT("BATTERY: ");
+    SERIAL_PRINT(getBatteryStatus());
+    SERIAL_PRINT("\tSPEED: ");
+    SERIAL_PRINTLN(BASE_SPEED(getBatteryStatus()));
+#ifdef DONT_MOVE
+    return;
+#endif
+    
 #ifdef USE_EDGE
     uint8_t irStatus;
     if ((irStatus = getIRStatus())) {
@@ -200,6 +214,9 @@ void loop()
     
     int16_t lDistance;
     int16_t rDistance;
+    
+    /*int16_t lDistance = leftSonar->getDistance();
+    int16_t rDistance = rightSonar->getDistance();*/
 
     SERIAL_PRINT(lDistance);
     SERIAL_PRINT('\t');
@@ -245,6 +262,9 @@ void loop()
         leftMotor->forward(lSpeed);
         rightMotor->forward(rSpeed);
         delay(500);
+        
+        /*lDistance = leftSonar->getDistance();
+        rDistance = rightSonar->getDistance();*/
     }
     
     if (distanceAffected) {
