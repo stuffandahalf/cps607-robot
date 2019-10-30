@@ -1,9 +1,9 @@
-//#define DONT_MOVE
-//#define SERIAL_DEBUG
-/*#define USE_EDGE
-#define USE_DISTANCE
+#define DONT_MOVE
+#define SERIAL_DEBUG
+//#define USE_EDGE
+//#define USE_DISTANCE
 #define USE_LINE
-#define USE_DELAY*/
+#define USE_DELAY
 //#define USE_LED
 #define USE_BATTERY_SENSE
 
@@ -19,8 +19,8 @@
 #define IR_SENSE_R  (A5)
 #define IR_SENSE_L  (A4)
 
-#define LINE_SENSE_F (A7)
-#define LINE_SENSE_R (A6)
+#define LINE_SENSE_F (7)
+#define LINE_SENSE_R (8)
 
 #define DISTANCE_SENSE_L_TRIGGER  (A1)
 #define DISTANCE_SENSE_L_ECHO     (A0)
@@ -29,10 +29,8 @@
 
 #define BATTERY_SENSE (A2)
 
-//#define BASE_SPEED(x)  (52 + (100 - x) / (4 + 4 * (x / 100)))
-//#define BASE_SPEED(x)  (54)
-//#define BASE_SPEED(x)  (54 + sq(100 - (x)) * 50)
-#define BASE_SPEED(x)  (54 + (100 - x) * 20 / 100)
+#define BASE_SPEED(x)  (54 + (100 - x) * 45 / 100)
+//#define BASE_SPEED(x)  (54 + (100 - x) * 20 / 100)
 #define R_SPEED(x)  (BASE_SPEED(x))
 #define L_SPEED(x)  (BASE_SPEED(x) + 10)
 
@@ -43,6 +41,11 @@
 #define IR_STATUS_FR    (IR_STATUS_F | IR_STATUS_R)
 #define IR_STATUS_FL    (IR_STATUS_F | IR_STATUS_L)
 #define IR_STATUS_ALL   (IR_STATUS_F | IR_STATUS_R | IR_STATUS_L)
+
+#define LINE_STATUS_CLEAR   (0)
+#define LINE_STATUS_F       (1 << 0)
+#define LINE_STATUS_R       (1 << 1)
+#define LINE_STATUS_BOTH    (LINE_STATUS_F | LINE_STATUS_R)
 
 #define SONAR_DISTANCE  (250)
 #define SONAR_SEQUENCE_DELAY (350)
@@ -65,13 +68,14 @@ MotorControl *rightMotor;
 
 SonarSensor *leftSonar;
 SonarSensor *rightSonar;
+bool onLine;
 
 //bool turnClockwise;
 
 const byte vout[] = { 2 };
 const byte vout_count = sizeof(vout) / sizeof(byte);
 
-inline uint8_t getIRStatus()
+inline uint8_t getEdgeStatus()
 {
     uint8_t status = IR_STATUS_CLEAR;
     
@@ -88,14 +92,24 @@ inline uint8_t getIRStatus()
     return status;
 }
 
+inline uint8_t getLineStatus()
+{
+    uint8_t status = LINE_STATUS_CLEAR;
+    if (digitalRead(LINE_SENSE_F)) {
+        status |= LINE_STATUS_F;
+    }
+    if (digitalRead(LINE_SENSE_R)) {
+        status |= LINE_STATUS_R;
+    }
+    return status;
+}
+
 template <typename T>
 inline bool inRange(T x, T a, T b) { return a <= x && x < b; }
 
 inline int getBatteryStatus()
 {
 #ifdef USE_BATTERY_SENSE
-    //return map(analogRead(BATTERY_SENSE), 457, 589, 0, 100);
-    //return analogRead(BATTERY_SENSE);
     return map(analogRead(BATTERY_SENSE), 150, 650, 0, 100);
 #else
     //return 59;
@@ -138,11 +152,17 @@ void setup()
 
 void loop()
 {
-    //SERIAL_PRINTLN(getBatteryStatus());
-    SERIAL_PRINT("BATTERY: ");
+    /*SERIAL_PRINT("BATTERY: ");
     SERIAL_PRINT(getBatteryStatus());
     SERIAL_PRINT("\tSPEED: ");
-    SERIAL_PRINTLN(BASE_SPEED(getBatteryStatus()));
+    SERIAL_PRINTLN(BASE_SPEED(getBatteryStatus()));*/
+    
+    /*SERIAL_PRINT("FRONT: ");
+    SERIAL_PRINT(digitalRead(LINE_SENSE_F));
+    SERIAL_PRINT("\tREAR: ");
+    SERIAL_PRINTLN(digitalRead(LINE_SENSE_R));*/
+    
+    SERIAL_PRINTLN(rightSonar->getDistance());
 #ifdef DONT_MOVE
     return;
 #endif
@@ -200,13 +220,38 @@ void loop()
 #ifdef USE_DELAY
         delay(turnDelay);
 #endif
-        
+#ifdef USE_LINE
+        onLine = false;
+#endif
         return;
     }
 #endif
     
 #ifdef USE_LINE
-    
+    uint8_t lineStatus = getLineStatus();
+    switch (lineStatus) {
+    case LINE_STATUS_F:
+        break;
+    case LINE_STATUS_R:
+        if (onLine) {
+            // sweep 180* to relocate line. if not found, online = false
+            SERIAL_PRINTLN("RELOCATING LINE");
+        }
+        else {
+            // sweep 360* to locate line.
+            
+            SERIAL_PRINTLN("LOCATING LINE");
+        }
+        break;
+    case LINE_STATUS_BOTH:
+        SERIAL_PRINTLN("ON LINE");
+        onLine = true;
+        break;
+    case LINE_STATUS_CLEAR:
+    default:
+        onLine = false;
+        break;
+    }
 #endif
     
 #ifdef USE_DISTANCE
