@@ -51,7 +51,8 @@ public:
             return;
         }
         if (pwm < 0) {
-            reverse((pwm * -1) + 15);
+            //reverse((pwm * -1) + 15);
+            reverse((pwm * -1) + 25);
             return;
         }
         this->pwm = pwm & 0xFF;
