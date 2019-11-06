@@ -8,6 +8,9 @@
 #define KICKSTART_PWM (192)
 #define KICKSTART_DELAY (10)
 #endif
+//#define REVERSE_OFFSET (20)
+#define REVERSE_OFFSET (10)
+//#define REVERSE_OFFSET (15)
 
 class MotorControl {
 private:
@@ -52,7 +55,7 @@ public:
         }
         if (pwm < 0) {
             //reverse((pwm * -1) + 15);
-            reverse((pwm * -1) + 25);
+            reverse((pwm * -1) + REVERSE_OFFSET);
             return;
         }
         this->pwm = pwm & 0xFF;

@@ -1,8 +1,9 @@
 //#define DONT_MOVE
-#define SERIAL_DEBUG
+//#define SERIAL_DEBUG
 #define USE_EDGE
 #define USE_DISTANCE
-#define USE_LINE
+//#define USE_LINE
+#define USE_LINE2
 #define USE_DELAY
 //#define USE_LED
 #define USE_BATTERY_SENSE
@@ -16,24 +17,26 @@
 #define MOTOR_LB    (5)
 
 //#define IR_SENSE_F  (11)
-#define EDGE_F_SONAR_TRIGGER    (3)
-#define EDGE_F_SONAR_ECHO       (4)
-#define EDGE_R_IR_SENSE         (A5)
-#define EDGE_L_IR_SENSE         (A4)
+#define EDGE_F_SONAR_TRIGGER    (A0)
+#define EDGE_F_SONAR_ECHO       (A1)
+#define EDGE_R_IR_SENSE         (3)
+#define EDGE_L_IR_SENSE         (4)
 
-#define LINE_SENSE_F (7)
-#define LINE_SENSE_R (8)
+#define LINE_SENSE_FRONT_LEFT   (8)
+#define LINE_SENSE_FRONT_RIGHT  (7)
+#define LINE_SENSE_REAR         (A3)
 
-//#define DISTANCE_SENSE_L_TRIGGER  (A1)
-//#define DISTANCE_SENSE_L_ECHO     (A0)
-//#define DISTANCE_SENSE_R_TRIGGER  (3)
-//#define DISTANCE_SENSE_R_ECHO     (4)
-#define DISTANCE_IR_SENSE (11)
+#define DISTANCE_SENSE_L_TRIGGER  (A4)
+#define DISTANCE_SENSE_L_ECHO     (12)
+#define DISTANCE_SENSE_R_TRIGGER  (A5)
+#define DISTANCE_SENSE_R_ECHO     (11)
+//#define DISTANCE_IR_SENSE (11)
 
 #define BATTERY_SENSE (A2)
 
-#define BASE_SPEED(x)  (54 + (100 - x) * 45 / 100 - 5)
-//#define BASE_SPEED(x)  (54 + (100 - x) * 20 / 100)
+//#define BASE_SPEED(x)  (54 + (100 - x) * 45 / 100 - 5)
+#define BASE_SPEED(x)  (54 + (100 - x) * 60 / 100 - 5)
+//#define BASE_SPEED(x)  (75)
 #define R_SPEED(x)  (BASE_SPEED(x))
 #define L_SPEED(x)  (BASE_SPEED(x) + 10)
 
@@ -46,9 +49,13 @@
 #define EDGE_STATUS_ALL   (EDGE_STATUS_F | EDGE_STATUS_R | EDGE_STATUS_L)
 
 #define LINE_STATUS_CLEAR   (0)
-#define LINE_STATUS_F       (1 << 0)
-#define LINE_STATUS_R       (1 << 1)
-#define LINE_STATUS_BOTH    (LINE_STATUS_F | LINE_STATUS_R)
+#define LINE_STATUS_FRONT_RIGHT (1 << 0)
+#define LINE_STATUS_FRONT_LEFT  (1 << 1)
+#define LINE_STATUS_REAR        (1 << 2)
+#define LINE_STATUS_FRONT_BOTH  (LINE_STATUS_FRONT_RIGHT | LINE_STATUS_FRONT_LEFT)
+#define LINE_STATUS_ALL         (LINE_STATUS_FRONT_BOTH | LINE_STATUS_REAR)
+
+#define LINE_DELAY (250)
 
 #define MAX_LINE_ALIGN_CYCLES (128)
 #define LINE_ROTATION_DELAY (16)
@@ -76,9 +83,9 @@ MotorControl *rightMotor;
 
 SonarSensor *frontEdgeSonar;
 
-//SonarSensor *leftSonar;
-//SonarSensor *rightSonar;
-bool onLine;
+SonarSensor *leftSonar;
+SonarSensor *rightSonar;
+bool evenCycle;
 
 //bool turnClockwise;
 
@@ -108,11 +115,14 @@ inline uint8_t getEdgeStatus()
 inline uint8_t getLineStatus()
 {
     uint8_t status = LINE_STATUS_CLEAR;
-    if (digitalRead(LINE_SENSE_F)) {
-        status |= LINE_STATUS_F;
+    if (digitalRead(LINE_SENSE_FRONT_LEFT)) {
+        status |= LINE_STATUS_FRONT_LEFT;
     }
-    if (digitalRead(LINE_SENSE_R)) {
-        status |= LINE_STATUS_R;
+    if (digitalRead(LINE_SENSE_FRONT_RIGHT)) {
+        status |= LINE_STATUS_FRONT_RIGHT;
+    }
+    if (digitalRead(LINE_SENSE_REAR)) {
+        status |= LINE_STATUS_REAR;
     }
     return status;
 }
@@ -130,6 +140,7 @@ inline int getBatteryStatus()
 #endif
 }
 
+#if 0
 inline int degreesToCycles(int degrees)
 {
     return map(degrees, 0, 360, 0, MAX_LINE_ALIGN_CYCLES);
@@ -174,6 +185,25 @@ bool lineAlign(int maxAlignCycles)
     
     return cycles != maxAlignCycles;
 }
+#endif
+
+void locateLine()
+{
+    int16_t lSpeed = L_SPEED(getBatteryStatus());
+    int16_t rSpeed = R_SPEED(getBatteryStatus());
+    
+    rSpeed *= -1;
+    
+    
+    leftMotor->forward(lSpeed);
+    rightMotor->forward(rSpeed);
+    
+    while (!(getLineStatus() & LINE_STATUS_FRONT_RIGHT));
+    while (getLineStatus() & LINE_STATUS_FRONT_RIGHT);
+    
+    leftMotor->brake();
+    rightMotor->brake();
+}
 
 void setup()
 {
@@ -182,21 +212,24 @@ void setup()
 #endif
     //turnClockwise = true;
     
+    evenCycle = true;
+    
     leftMotor = new MotorControl(MOTOR_LB, MOTOR_LA);
     rightMotor = new MotorControl(MOTOR_RA, MOTOR_RB);
     
-    //leftSonar = new SonarSensor(DISTANCE_SENSE_L_TRIGGER, DISTANCE_SENSE_L_ECHO);
-    //rightSonar = new SonarSensor(DISTANCE_SENSE_R_TRIGGER, DISTANCE_SENSE_R_ECHO);
+    leftSonar = new SonarSensor(DISTANCE_SENSE_L_TRIGGER, DISTANCE_SENSE_L_ECHO);
+    rightSonar = new SonarSensor(DISTANCE_SENSE_R_TRIGGER, DISTANCE_SENSE_R_ECHO);
     frontEdgeSonar = new SonarSensor(EDGE_F_SONAR_TRIGGER, EDGE_F_SONAR_ECHO);
     
     //pinMode(IR_SENSE_F, INPUT);
     pinMode(EDGE_R_IR_SENSE, INPUT);
     pinMode(EDGE_L_IR_SENSE, INPUT);
     
-    pinMode(LINE_SENSE_F, INPUT);
-    pinMode(LINE_SENSE_R, INPUT);
+    pinMode(LINE_SENSE_FRONT_LEFT, INPUT);
+    pinMode(LINE_SENSE_FRONT_RIGHT, INPUT);
+    pinMode(LINE_SENSE_REAR, INPUT);
     
-    pinMode(DISTANCE_IR_SENSE, INPUT);
+    //pinMode(DISTANCE_IR_SENSE, INPUT);
     
     for (int i = 0; i < vout_count; i++) {
         pinMode(vout[i], OUTPUT);
@@ -214,21 +247,33 @@ void setup()
 
 void loop()
 {
-    /*SERIAL_PRINT("BATTERY: ");
+    SERIAL_PRINT("BATTERY: ");
     SERIAL_PRINT(getBatteryStatus());
     SERIAL_PRINT("\tSPEED: ");
-    SERIAL_PRINTLN(BASE_SPEED(getBatteryStatus()));*/
+    SERIAL_PRINTLN(BASE_SPEED(getBatteryStatus()));
     
     /*SERIAL_PRINT("FRONT: ");
     SERIAL_PRINT(digitalRead(LINE_SENSE_F));
     SERIAL_PRINT("\tREAR: ");
     SERIAL_PRINTLN(digitalRead(LINE_SENSE_R));*/
     
+    /*SERIAL_PRINT("FRONT: ");
+    SERIAL_PRINT(frontEdgeSonar->getDistance());
+    SERIAL_PRINT("\TLEFT: ");
+    SERIAL_PRINT(leftSonar->getDistance());
+    SERIAL_PRINT("\tRIGHT: ");
+    SERIAL_PRINTLN(rightSonar->getDistance());*/
+    
     //SERIAL_PRINTLN(getEdgeStatus());
+    
+    /*SERIAL_PRINT("LINE_SENSE STATUS: ");
+    SERIAL_PRINTLN(getLineStatus());*/
     
 #ifdef DONT_MOVE
     return;
 #endif
+
+    evenCycle = !evenCycle;
     
 #ifdef USE_EDGE
     uint8_t edgeStatus;
@@ -249,7 +294,7 @@ void loop()
         case EDGE_STATUS_FR:
             rSpeed = 0;
             // fall through
-        //case EDGE_STATUS_R:
+        case EDGE_STATUS_R: /* TEST THIS */
             lSpeed *= -1;
 #ifdef USE_DELAY
             turnDelay = TURN_DELAY;
@@ -258,7 +303,7 @@ void loop()
         case EDGE_STATUS_FL:
             lSpeed = 0;
             // fall through
-        //case EDGE_STATUS_L:
+        case EDGE_STATUS_L: /* AND THIS */
             rSpeed *= -1;
 #ifdef USE_DELAY
             turnDelay = TURN_DELAY;
@@ -296,6 +341,7 @@ void loop()
     case LINE_STATUS_F:
         break;
     case LINE_STATUS_R:
+        delay(50);
         if (onLine) {
             // sweep 180* to relocate line. if not found, online = false
             SERIAL_PRINTLN("RELOCATING LINE");
@@ -333,7 +379,39 @@ void loop()
         break;
     }
 #endif
-    
+
+#ifdef USE_LINE2
+    uint8_t lineStatus = getLineStatus();
+    if (lineStatus != LINE_STATUS_CLEAR) {
+        int16_t lSpeed = L_SPEED(getBatteryStatus()) + 5;
+        int16_t rSpeed = R_SPEED(getBatteryStatus()) + 5;
+        int16_t lineDelay = 0;
+        
+        switch (lineStatus & LINE_STATUS_FRONT_BOTH) {
+        case LINE_STATUS_FRONT_LEFT:
+            lSpeed *= -1;
+            lineDelay = LINE_DELAY;
+            break;
+        case LINE_STATUS_FRONT_RIGHT:
+            rSpeed *= -1;
+            lineDelay = LINE_DELAY;
+            break;
+        case LINE_STATUS_FRONT_BOTH:
+            while (!(getLineStatus() & LINE_STATUS_REAR)) {
+                leftMotor->forward(lSpeed);
+                rightMotor->forward(rSpeed);
+            }
+            locateLine();
+            break;
+        }
+        
+        leftMotor->forward(lSpeed);
+        rightMotor->forward(rSpeed);
+        delay(lineDelay);
+        return;
+    }
+#endif
+
 #ifdef USE_DISTANCE
     bool distanceAffected = false;
     
@@ -347,9 +425,9 @@ void loop()
     SERIAL_PRINT('\t');
     SERIAL_PRINTLN(rDistance);*/
     
-    /*while (inRange<int16_t>((lDistance = leftSonar->getDistance()), 0, SONAR_DISTANCE) ||
-        inRange<int16_t>((rDistance = rightSonar->getDistance()), 0, SONAR_DISTANCE)) {*/
-    while (!digitalRead(DISTANCE_IR_SENSE)) {
+    while (inRange<int16_t>((lDistance = leftSonar->getDistance()), 0, SONAR_DISTANCE) ||
+        inRange<int16_t>((rDistance = rightSonar->getDistance()), 0, SONAR_DISTANCE)) {
+    //while (!digitalRead(DISTANCE_IR_SENSE)) {
 #ifdef USE_LED
         digitalWrite(13, !digitalRead(13));
 #endif
@@ -370,20 +448,20 @@ void loop()
             rightMotor->brake();
         }
         
-        //if (/*lDistance != -1 &&*/ lDistance < rDistance) {
+        if (/*lDistance != -1 &&*/ lDistance < rDistance) {
             //lSpeed = 0;
             rSpeed *= -1;
 #ifdef USE_DELAY
             turnDelay = TURN_DELAY;
 #endif
-        //}
-        //else /*if (rDistance != -1 && lDistance > rDistance)*/ {
-            ////rSpeed = 0;
-            //lSpeed *= -1;
-//#ifdef USE_DELAY
-            //turnDelay = TURN_DELAY;
-//#endif
-        //}
+        }
+        else /*if (rDistance != -1 && lDistance > rDistance)*/ {
+            //rSpeed = 0;
+            lSpeed *= -1;
+#ifdef USE_DELAY
+            turnDelay = TURN_DELAY;
+#endif
+        }
         
         leftMotor->forward(lSpeed);
         rightMotor->forward(rSpeed);
@@ -398,8 +476,7 @@ void loop()
     }
 #endif
     
-    SERIAL_PRINTLN("DOES IT GET HERE HELLOOOOOO?");
-    leftMotor->forward(L_SPEED(getBatteryStatus()) + (onLine ? 20 : 0));
-    rightMotor->forward(R_SPEED(getBatteryStatus()) + (onLine ? 20 : 0));
+    leftMotor->forward(L_SPEED(getBatteryStatus()));
+    rightMotor->forward(R_SPEED(getBatteryStatus()));
 
 }
