@@ -35,7 +35,7 @@
 #define BATTERY_SENSE (A2)
 
 //#define BASE_SPEED(x)  (54 + (100 - x) * 45 / 100 - 5)
-#define BASE_SPEED(x)  (54 + (100 - x) * 60 / 100 - 5)
+#define BASE_SPEED(x)  (54 + (100 - x) * 58 / 100 - 5)
 //#define BASE_SPEED(x)  (75)
 #define R_SPEED(x)  (BASE_SPEED(x))
 #define L_SPEED(x)  (BASE_SPEED(x) + 10)
