@@ -1,4 +1,4 @@
-//#define DONT_MOVE
+#define DONT_MOVE
 #define SERIAL_DEBUG
 //#define USE_EDGE
 //#define USE_DISTANCE
@@ -61,6 +61,10 @@
 #define MAX_LINE_ALIGN_CYCLES (128)
 #define LINE_ROTATION_DELAY (16)
 
+#define FLAME_STATUS_CLEAR  (0)
+#define FLAME_STATUS_LEFT   (1)
+#define FLAME_STATUS_RIGHT  (2)
+#define FLAME_STATUS_BOTH   (FLAME_STATUS_LEFT | FLAME_STATUS_RIGHT)
 
 #define SONAR_DISTANCE  (250)
 #define SONAR_SEQUENCE_DELAY (350)
@@ -124,6 +128,22 @@ inline uint8_t getLineStatus()
     }
     if (digitalRead(LINE_SENSE_REAR)) {
         status |= LINE_STATUS_REAR;
+    }
+    return status;
+}
+
+inline uint8_t getFlameStatus()
+{
+    uint8_t status = FLAME_STATUS_CLEAR;
+    //SERIAL_PRINT(analogRead(FLAME_L_IR_SENSE));
+    //SERIAL_PRINT(" ");
+    if (inRange<int>(analogRead(FLAME_L_IR_SENSE), 210, 280)) {
+        status |= FLAME_STATUS_LEFT;
+    }
+    //SERIAL_PRINT(analogRead(FLAME_R_IR_SENSE));
+    //SERIAL_PRINT(" ");
+    if (inRange<int>(analogRead(FLAME_R_IR_SENSE), 150, 200)) {
+        status |= FLAME_STATUS_RIGHT;
     }
     return status;
 }
@@ -204,10 +224,10 @@ void setup()
 
 void loop()
 {
-    SERIAL_PRINT("BATTERY: ");
+    /*SERIAL_PRINT("BATTERY: ");
     SERIAL_PRINT(getBatteryStatus());
     SERIAL_PRINT("\tSPEED: ");
-    SERIAL_PRINTLN(BASE_SPEED(getBatteryStatus()));
+    SERIAL_PRINTLN(BASE_SPEED(getBatteryStatus()));*/
     
     /*SERIAL_PRINT("FRONT: ");
     SERIAL_PRINT(digitalRead(LINE_SENSE_F));
@@ -225,6 +245,9 @@ void loop()
     
     /*SERIAL_PRINT("LINE_SENSE STATUS: ");
     SERIAL_PRINTLN(getLineStatus());*/
+    
+    SERIAL_PRINT("FLAME_SENSE STATUS: ");
+    SERIAL_PRINTLN(getFlameStatus());
     
 #ifdef DONT_MOVE
     return;
@@ -337,6 +360,14 @@ void loop()
     SERIAL_PRINT('\t');
     SERIAL_PRINTLN(rDistance);*/
     
+#ifdef USE_FLAME
+    uint8_t flameState;
+    if (flameState = getFlameStatus()) {
+        
+    }
+    else {
+#endif
+    
     while (inRange<int16_t>((lDistance = leftSonar->getDistance()), 0, SONAR_DISTANCE) ||
         inRange<int16_t>((rDistance = rightSonar->getDistance()), 0, SONAR_DISTANCE)) {
     //while (!digitalRead(DISTANCE_IR_SENSE)) {
@@ -382,6 +413,9 @@ void loop()
         /*lDistance = leftSonar->getDistance();
         rDistance = rightSonar->getDistance();*/
     }
+#ifdef USE_FLAME
+    }
+#endif
     
     if (distanceAffected) {
         return;
