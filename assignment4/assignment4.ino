@@ -1,9 +1,9 @@
 //#define DONT_MOVE
-//#define SERIAL_DEBUG
-#define USE_EDGE
-#define USE_DISTANCE
-//#define USE_LINE
-#define USE_LINE2
+#define SERIAL_DEBUG
+//#define USE_EDGE
+//#define USE_DISTANCE
+//#define USE_LINE2
+#define USE_FLAME
 #define USE_DELAY
 //#define USE_LED
 #define USE_BATTERY_SENSE
@@ -16,7 +16,6 @@
 #define MOTOR_LA    (6)
 #define MOTOR_LB    (5)
 
-//#define IR_SENSE_F  (11)
 #define EDGE_F_SONAR_TRIGGER    (A0)
 #define EDGE_F_SONAR_ECHO       (A1)
 #define EDGE_R_IR_SENSE         (3)
@@ -30,7 +29,9 @@
 #define DISTANCE_SENSE_L_ECHO     (12)
 #define DISTANCE_SENSE_R_TRIGGER  (A5)
 #define DISTANCE_SENSE_R_ECHO     (11)
-//#define DISTANCE_IR_SENSE (11)
+
+#define FLAME_L_IR_SENSE    (A6)
+#define FLAME_R_IR_SENSE    (A7)
 
 #define BATTERY_SENSE (A2)
 
@@ -48,7 +49,7 @@
 #define EDGE_STATUS_FL    (EDGE_STATUS_F | EDGE_STATUS_L)
 #define EDGE_STATUS_ALL   (EDGE_STATUS_F | EDGE_STATUS_R | EDGE_STATUS_L)
 
-#define LINE_STATUS_CLEAR   (0)
+#define LINE_STATUS_CLEAR       (0)
 #define LINE_STATUS_FRONT_RIGHT (1 << 0)
 #define LINE_STATUS_FRONT_LEFT  (1 << 1)
 #define LINE_STATUS_REAR        (1 << 2)
@@ -140,53 +141,6 @@ inline int getBatteryStatus()
 #endif
 }
 
-#if 0
-inline int degreesToCycles(int degrees)
-{
-    return map(degrees, 0, 360, 0, MAX_LINE_ALIGN_CYCLES);
-}
-
-inline int cycleToDegrees(int cycles)
-{
-    return map(cycles, 0, MAX_LINE_ALIGN_CYCLES, 0, 360);
-}
-
-bool lineAlign(int maxAlignCycles)
-{
-    int leftMultiplier = 1;
-    int rightMultiplier = -1;
-    
-    if (maxAlignCycles < 0) {
-        leftMultiplier = -1;
-        rightMultiplier = 1;
-        maxAlignCycles *= -1;
-    }
-    
-    if (maxAlignCycles == 0) {
-        maxAlignCycles = MAX_LINE_ALIGN_CYCLES;
-    }
-    
-    uint16_t cycles = 0;
-    uint8_t lineStatus;
-    while ((lineStatus = getLineStatus()) != LINE_STATUS_BOTH && cycles < maxAlignCycles) {
-        /*if (cycles % 2) {
-            delay(100);
-        }*/
-        leftMotor->forward(L_SPEED(getBatteryStatus()) * leftMultiplier - 10);
-        rightMotor->forward(R_SPEED(getBatteryStatus()) * rightMultiplier - 10);
-        delay(LINE_ROTATION_DELAY);
-        leftMotor->brake();
-        rightMotor->brake();
-        cycles++;
-    }
-    
-    leftMotor->forward(L_SPEED(getBatteryStatus()));
-    rightMotor->forward(R_SPEED(getBatteryStatus()));
-    
-    return cycles != maxAlignCycles;
-}
-#endif
-
 void locateLine()
 {
     int16_t lSpeed = L_SPEED(getBatteryStatus());
@@ -228,6 +182,9 @@ void setup()
     pinMode(LINE_SENSE_FRONT_LEFT, INPUT);
     pinMode(LINE_SENSE_FRONT_RIGHT, INPUT);
     pinMode(LINE_SENSE_REAR, INPUT);
+    
+    pinMode(FLAME_L_IR_SENSE, INPUT);
+    pinMode(FLAME_R_IR_SENSE, INPUT);
     
     //pinMode(DISTANCE_IR_SENSE, INPUT);
     
@@ -332,51 +289,6 @@ void loop()
         onLine = false;
 #endif
         return;
-    }
-#endif
-    
-#ifdef USE_LINE
-    uint8_t lineStatus = getLineStatus();
-    switch (lineStatus) {
-    case LINE_STATUS_F:
-        break;
-    case LINE_STATUS_R:
-        delay(50);
-        if (onLine) {
-            // sweep 180* to relocate line. if not found, online = false
-            SERIAL_PRINTLN("RELOCATING LINE");
-            if (lineAlign(MAX_LINE_ALIGN_CYCLES / 4) || lineAlign(MAX_LINE_ALIGN_CYCLES / 2 * -1)) {
-                onLine = true;
-                SERIAL_PRINTLN("FOUND LINE");
-            }
-            else {
-                onLine = false;
-                SERIAL_PRINTLN("LOST LINE");
-                delay(500);
-            }
-        }
-        else {
-            // sweep 360* to locate line.
-            SERIAL_PRINTLN("LOCATING LINE");
-            if (lineAlign(0)) {
-                onLine = true;
-                SERIAL_PRINTLN("FOUND LINE");
-            }
-            else {
-                onLine = false;
-                SERIAL_PRINTLN("NO LINE");
-                //delay(150);
-            }
-        }
-        break;
-    case LINE_STATUS_BOTH:
-        SERIAL_PRINTLN("ON LINE");
-        onLine = true;
-        break;
-    case LINE_STATUS_CLEAR:
-    default:
-        onLine = false;
-        break;
     }
 #endif
 

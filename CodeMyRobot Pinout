@@ -1,7 +1,7 @@
 J1 [ GND, A1, A0, +5v ]
 
-P2 [ +9v, +9v, +9v, +9v, |, |, |, |, |, |, +, +, +, +9v, +9v ] (| = connected vertically, + connected vertically and horizontally)
-   [ +9v, +9v, +9v, +9v, |, |, |, |, |, |, +, +, +, GND, GND ]
+P2 [ +9v, +9v, +9v, +9v, |, |, |, |, |, |, GND, GND, GND, +9v, +9v ] (| = connected vertically)
+   [ +9v, +9v, +9v, +9v, |, |, |, |, |, |, GND, GND, GND, GND, GND ]
 
 P3 [ +9v (out), +9v, +9v, +9v ] (input 9v)
 

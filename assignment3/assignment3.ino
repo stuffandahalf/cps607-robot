@@ -34,6 +34,10 @@
 
 #define BATTERY_SENSE (A2)
 
+#ifdef USE_LED
+#define LED (13)
+#endif
+
 //#define BASE_SPEED(x)  (54 + (100 - x) * 45 / 100 - 5)
 #define BASE_SPEED(x)  (54 + (100 - x) * 58 / 100 - 5)
 //#define BASE_SPEED(x)  (75)
@@ -237,7 +241,7 @@ void setup()
     }
     
 #ifdef USE_LED
-    pinMode(13, OUTPUT);
+    pinMode(LED, OUTPUT);
 #endif
 #ifdef USE_BATTERY_SENSE
     pinMode(BATTERY_SENSE, INPUT);
@@ -429,7 +433,7 @@ void loop()
         inRange<int16_t>((rDistance = rightSonar->getDistance()), 0, SONAR_DISTANCE)) {
     //while (!digitalRead(DISTANCE_IR_SENSE)) {
 #ifdef USE_LED
-        digitalWrite(13, !digitalRead(13));
+        digitalWrite(LED, !digitalRead(LED));
 #endif
             
         distanceAffected = true;
