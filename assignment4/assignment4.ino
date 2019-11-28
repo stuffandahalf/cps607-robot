@@ -1,8 +1,12 @@
-#define DONT_MOVE
-#define SERIAL_DEBUG
-//#define USE_EDGE
-//#define USE_DISTANCE
-//#define USE_LINE2
+/* Debug macros */
+//#define DONT_MOVE
+//#define SERIAL_DEBUG
+//#define ANALOG_DIGITAL_DEBUG
+
+/* Feature macros */
+#define USE_EDGE
+#define USE_DISTANCE
+#define USE_LINE2
 #define USE_FLAME
 #define USE_DELAY
 //#define USE_LED
@@ -30,13 +34,15 @@
 #define DISTANCE_SENSE_R_TRIGGER  (A5)
 #define DISTANCE_SENSE_R_ECHO     (11)
 
-#define FLAME_L_IR_SENSE    (A6)
-#define FLAME_R_IR_SENSE    (A7)
+#define FLAME_L_IR_SENSE    (A2)
+#define FLAME_R_IR_SENSE    (2)
 
-#define BATTERY_SENSE (A2)
+#define BATTERY_SENSE (A6)
 
+//#define BASE_SPEED(x)   (54 + map(x, 0, 100, 60, 0))
+#define BASE_SPEED(x)   (54 + map(x, 0, 100, 90, 0))
 //#define BASE_SPEED(x)  (54 + (100 - x) * 45 / 100 - 5)
-#define BASE_SPEED(x)  (54 + (100 - x) * 58 / 100 - 5)
+//#define BASE_SPEED(x)  (54 + (100 - x) * 58 / 100 - 5)
 //#define BASE_SPEED(x)  (75)
 #define R_SPEED(x)  (BASE_SPEED(x))
 #define L_SPEED(x)  (BASE_SPEED(x) + 10)
@@ -66,7 +72,8 @@
 #define FLAME_STATUS_RIGHT  (2)
 #define FLAME_STATUS_BOTH   (FLAME_STATUS_LEFT | FLAME_STATUS_RIGHT)
 
-#define SONAR_DISTANCE  (250)
+//#define SONAR_DISTANCE  (250)
+#define SONAR_DISTANCE  (350)
 #define SONAR_SEQUENCE_DELAY (350)
 
 //#define TURN_DELAY (75)
@@ -94,8 +101,12 @@ bool evenCycle;
 
 //bool turnClockwise;
 
-const byte vout[] = { 2 };
-const byte vout_count = sizeof(vout) / sizeof(byte);
+/*const byte vout[] = { 2 };
+const byte vout_count = sizeof(vout) / sizeof(byte);*/
+
+
+template <typename T>
+inline bool inRange(T x, T a, T b) { return a <= x && x < b; }
 
 inline uint8_t getEdgeStatus()
 {
@@ -135,21 +146,24 @@ inline uint8_t getLineStatus()
 inline uint8_t getFlameStatus()
 {
     uint8_t status = FLAME_STATUS_CLEAR;
-    //SERIAL_PRINT(analogRead(FLAME_L_IR_SENSE));
-    //SERIAL_PRINT(" ");
-    if (inRange<int>(analogRead(FLAME_L_IR_SENSE), 210, 280)) {
+/*#ifdef ANALOG_DIGITAL_DEBUG
+    SERIAL_PRINT(analogRead(FLAME_L_IR_SENSE));
+    SERIAL_PRINT(" ");
+#endif
+    if (inRange<int>(analogRead(FLAME_L_IR_SENSE), 70, 250)) {*/
+    if (!digitalRead(FLAME_L_IR_SENSE)) {
         status |= FLAME_STATUS_LEFT;
     }
-    //SERIAL_PRINT(analogRead(FLAME_R_IR_SENSE));
-    //SERIAL_PRINT(" ");
-    if (inRange<int>(analogRead(FLAME_R_IR_SENSE), 150, 200)) {
+/*#ifdef ANALOG_DIGITAL_DEBUG
+    SERIAL_PRINT(analogRead(FLAME_R_IR_SENSE));
+    SERIAL_PRINT(" ");
+#endif
+    if (inRange<int>(analogRead(FLAME_R_IR_SENSE), 150, 305)) {*/
+    if (!digitalRead(FLAME_R_IR_SENSE)) {
         status |= FLAME_STATUS_RIGHT;
     }
     return status;
 }
-
-template <typename T>
-inline bool inRange(T x, T a, T b) { return a <= x && x < b; }
 
 inline int getBatteryStatus()
 {
@@ -208,10 +222,10 @@ void setup()
     
     //pinMode(DISTANCE_IR_SENSE, INPUT);
     
-    for (int i = 0; i < vout_count; i++) {
+    /*for (int i = 0; i < vout_count; i++) {
         pinMode(vout[i], OUTPUT);
         digitalWrite(vout[i], HIGH);
-    }
+    }*/
     
 #ifdef USE_LED
     pinMode(13, OUTPUT);
@@ -347,6 +361,41 @@ void loop()
     }
 #endif
 
+
+#ifdef USE_FLAME
+    //SERIAL_PRINTLN("GOT HERE");
+
+    uint8_t flameStatus = getFlameStatus();
+    if (flameStatus != FLAME_STATUS_CLEAR) {
+        switch (flameStatus) {
+        case FLAME_STATUS_LEFT:
+            //rightMotor->forward(R_SPEED(getBatteryStatus()) * -1);
+            rightMotor->brake();
+#ifdef USE_DELAY
+            delay(75);
+#endif
+            break;
+        case FLAME_STATUS_RIGHT:
+            //leftMotor->forward(L_SPEED(getBatteryStatus()) * -1);
+            leftMotor->brake();
+#ifdef USE_DELAY
+            delay(75);
+#endif
+            break;
+        case FLAME_STATUS_BOTH:
+            // Can't check for sensor distance, because candles sit too low for distance sensor
+            leftMotor->brake();
+            rightMotor->brake();
+            break;
+        /*case FLAME_STATUS_CLEAR:
+        default:
+            break;*/
+        }
+        
+        return;
+    }
+#endif
+
 #ifdef USE_DISTANCE
     bool distanceAffected = false;
     
@@ -359,14 +408,6 @@ void loop()
     /*SERIAL_PRINT(lDistance);
     SERIAL_PRINT('\t');
     SERIAL_PRINTLN(rDistance);*/
-    
-#ifdef USE_FLAME
-    uint8_t flameState;
-    if (flameState = getFlameStatus()) {
-        
-    }
-    else {
-#endif
     
     while (inRange<int16_t>((lDistance = leftSonar->getDistance()), 0, SONAR_DISTANCE) ||
         inRange<int16_t>((rDistance = rightSonar->getDistance()), 0, SONAR_DISTANCE)) {
@@ -413,15 +454,12 @@ void loop()
         /*lDistance = leftSonar->getDistance();
         rDistance = rightSonar->getDistance();*/
     }
-#ifdef USE_FLAME
-    }
-#endif
     
     if (distanceAffected) {
         return;
     }
 #endif
-    
+
     leftMotor->forward(L_SPEED(getBatteryStatus()));
     rightMotor->forward(R_SPEED(getBatteryStatus()));
 
