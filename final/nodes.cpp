@@ -3,6 +3,7 @@
 #else
 #include <cstdint>
 #include <cstddef>
+#include <iostream>
 #endif
 #include "Node.h"
 
@@ -10,6 +11,8 @@ Node *start_node_1;
 Node *start_node_2;
 Node *start_node_3;
 Node *end_node;
+Node *left_intersection;
+Node *right_intersection;
 
 static Node *nodes[NODE_COUNT];
 
@@ -26,6 +29,9 @@ void init_nodes()
     start_node_3 = nodes[4];    // 5th node is start
     end_node = nodes[14];       // last node is end
     
+    right_intersection = nodes[5];
+    left_intersection = nodes[9];
+    
     
     uint8_t simple_nodes[] = { 1, 2, 3, 
                                6, 7, 8,
@@ -35,27 +41,50 @@ void init_nodes()
         uint8_t node_index = simple_nodes[i];
         
         nodes[node_index]->edge_count = 2;
-        nodes[node_index]->edges = new Node *[2] { nodes[node_index - 1], nodes[node_index + 1] };
+        nodes[node_index]->edges = new Edge[2] {
+            { nodes[node_index - 1], DIRECTION_EAST },
+            { nodes[node_index + 1], DIRECTION_WEST }
+        };
     }
     
     
     start_node_1->edge_count = 2;
-    start_node_1->edges = new Node *[2] { nodes[1], nodes[5] };
+    start_node_1->edges = new Edge[2] {
+        { nodes[1], DIRECTION_WEST },
+        { nodes[5], DIRECTION_NORTH }
+    };
     
     start_node_2->edge_count = 2;
-    start_node_2->edges = new Node *[2] { nodes[5], nodes[11] };
+    start_node_2->edges = new Edge[2] {
+        { nodes[5], DIRECTION_SOUTH },
+        { nodes[11], DIRECTION_WEST }
+    };
     
     start_node_3->edge_count = 2;
-    start_node_3->edges = new Node *[2] { nodes[3], nodes[9] };
+    start_node_3->edges = new Edge[2] {
+        { nodes[3], DIRECTION_EAST },
+        { nodes[9], DIRECTION_NORTH }
+    };
     
     end_node->edge_count = 2;
-    end_node->edges = new Node *[2] { nodes[9], nodes[13] };
+    end_node->edges = new Edge[2] {
+        { nodes[9], DIRECTION_SOUTH },
+        { nodes[13], DIRECTION_EAST }
+    };
     
-    nodes[5]->edge_count = 3;
-    nodes[5]->edges = new Node *[3] { nodes[0], nodes[6], nodes[10] };
+    right_intersection->edge_count = 3;
+    right_intersection->edges = new Edge[3] {
+        { nodes[0], DIRECTION_SOUTH },
+        { nodes[6], DIRECTION_WEST },
+        { nodes[10], DIRECTION_NORTH }
+    };
     
-    nodes[9]->edge_count = 3;
-    nodes[9]->edges = new Node *[3] { nodes[4], nodes[8], nodes[14] };
+    left_intersection->edge_count = 3;
+    left_intersection->edges = new Edge[3] {
+        { nodes[4], DIRECTION_SOUTH },
+        { nodes[8], DIRECTION_EAST },
+        { nodes[14], DIRECTION_NORTH }
+    };
 }
 
 void delete_nodes()
@@ -69,28 +98,35 @@ void delete_nodes()
     start_node_2 = 0;
     start_node_3 = 0;
     end_node = 0;
+    left_intersection = 0;
+    right_intersection = 0;
 }
 
-bool reachable_node(Node *& start, Node *& end, LinkedList<Node *> *path)
+bool reachable_node(Node *& start, Node *& end, Path *path)
 {
     return reachable_id(start, end->id, path);
 }
 
-bool reachable_id(Node *& start, uint8_t end_node, LinkedList<Node *> *path)
+bool reachable_id(Node *& start, uint8_t end_node, Path *path)
 {
-    path->add(start);
     if (start->id == end_node) {
         return true;
     }
     
-    LinkedList<LinkedList<Node *> *> *branches = new LinkedList<LinkedList<Node *> *>();
+    LinkedList<Path *> *branches = new LinkedList<Path *>();
     for (uint16_t i = 0; i < start->edge_count; i++) {
-        LinkedList<Node *> *branch = path->clone();
-        branch->setRef(branch->getLast());
+        Path *branch = path->clone();
         
-        Node *next = start->edges[i];
+        Edge *next = &start->edges[i];
+        branch->edges.add(next);
+        branch->edges.setRef(branch->edges.getLast());
         
-        if (!path->contains(next) && reachable_id(next, end_node, branch)) {
+        if (path->node_traversed(next->node)) {
+            delete branch;
+            continue;
+        }
+        
+        if (reachable_id(next->node, end_node, branch)) {
             branches->add(branch);
         }
         else {
@@ -100,20 +136,18 @@ bool reachable_id(Node *& start, uint8_t end_node, LinkedList<Node *> *path)
     
     if (branches->empty()) {
         delete branches;
-        path->removeLast();
         return false;
     }
     
-    LinkedList<Node *> *shortest_branch = branches->getFirst()->value;
-    size_t shortest_length = shortest_branch->size_from_ref();
-    
-    for (LinkedList<LinkedList<Node *> *>::ListNode *ln = branches->getFirst()->next; ln != NULL; ln = ln->next) {
-        size_t current_length = ln->value->size_from_ref();
-        if (current_length < shortest_length) {
-            delete shortest_branch;
+    Path *shortest_path = branches->getFirst()->value;
+    size_t shortest_size = shortest_path->edges.size_from_ref();
+    for (LinkedList<Path *>::ListNode *ln = branches->getFirst()->next; ln != NULL; ln = ln->next) {
+        size_t current_size = ln->value->edges.size_from_ref();
+        if (current_size < shortest_size) {
+            delete shortest_path;
             
-            shortest_branch = ln->value;
-            shortest_length = current_length;
+            shortest_size = current_size;
+            shortest_path = ln->value;
         }
         else {
             delete ln->value;
@@ -122,9 +156,9 @@ bool reachable_id(Node *& start, uint8_t end_node, LinkedList<Node *> *path)
     
     delete branches;
     
-    for (LinkedList<Node *>::ListNode *ln = shortest_branch->getRef()->next; ln != NULL; ln = ln->next) {
-        path->add(ln->value);
+    for (LinkedList<Edge *>::ListNode *ln = shortest_path->edges.getRef(); ln != NULL; ln = ln->next) {
+        path->edges.add(ln->value);
     }
-    delete shortest_branch;
+    delete shortest_path;
     return true;
 }

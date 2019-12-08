@@ -32,6 +32,12 @@ public:
         this->reference = NULL;
     }
     
+    LinkedList(LinkedList<T>& ll) : LinkedList()
+    {
+        this->append(ll);
+        this->setRef(ll.getRef());
+    }
+    
     ~LinkedList()
     {
         ListNode *ln = this->last;
@@ -43,9 +49,7 @@ public:
     }
     
     LinkedList<T> *clone() {
-        LinkedList<T> *c = new LinkedList<T>();
-        c->append(*this);
-        return c;
+        return new LinkedList<T>(*this);
     }
     
     void add(T& value)
