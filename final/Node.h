@@ -21,7 +21,8 @@ extern Node *start_node_3;
 extern Node *end_node;
 
 void init_nodes();
-bool reachable(Node *start, Node *end, LinkedList<Node> *path);
-bool reachable(Node *start, uint8_t id, LinkedList<Node> *path);
+void delete_nodes();
+bool reachable_node(Node *& start, Node *& end, LinkedList<Node *> *path);
+bool reachable_id(Node *& start, uint8_t id, LinkedList<Node *> *path);
 
 #endif
