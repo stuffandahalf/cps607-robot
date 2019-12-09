@@ -6,6 +6,8 @@
 #define SERIAL_DEBUG
 #define NO_SENSORS
 
+#define USE_BATTERY_SENSE
+
 // peripheral pin macros
 #define MOTOR_RA    (10)
 #define MOTOR_RB    (9)
@@ -14,14 +16,18 @@
 
 #define FLAME_SENSE     (A5)
 
-#define LINE_SENSE_L    (8)
-#define LINE_SENSE_R    (7)
-#define LINE_SENSE_B    (A3)
+#define LINE_SENSE_L    (2)
+#define LINE_SENSE_R    (4)
+#define LINE_SENSE_B    (3)
 
-#define DISTANCE_SENSE_TRIGGER  ()
-#define DISTANCE_SENSE_ECHO     ()
+#define DISTANCE_SENSE_TRIGGER  (8)
+#define DISTANCE_SENSE_ECHO     (7)
+
+#define LIFT_SERVO      (11)    
 
 #define BATTERY_SENSE   (A6)
+
+#define LED             (13)
 
 // serial debug macros
 #ifdef SERIAL_DEBUG
@@ -49,9 +55,14 @@ SonarSensor *distance_sensor;
 Node *current_node;
 Direction current_direction;
 
+#define SEARCH_NODE_COUNT   (5)
+Node **search_path;
+
 uint16_t turn_cw();
 uint16_t turn_ccw();
 void find_start_node();
+void set_search_path();
+void move(Edge *edge);
 
 template <typename T>
 inline bool inRange(T x, T a, T b) { return a <= x && x < b; }
@@ -85,6 +96,9 @@ void setup()
     
     pinMode(FLAME_SENSE, INPUT);
 #endif
+
+    pinMode(LED, OUTPUT);
+    digitalWrite(LED, LOW);
     
     current_node = NULL;
     current_direction = DIRECTION_INVALID;
@@ -92,21 +106,46 @@ void setup()
     init_nodes();
     find_start_node();
     
-    Path path(start_node_1);
+    /*Path path(start_node_1);
+    SERIAL_PRINTLN(F("HELLO WORLD"));
     reachable_node(path.start, end_node, &path);
-    SERIAL_PRINT("\t");
+    SERIAL_PRINT(F("\t"));
     SERIAL_PRINTLN(path.start->id);
     for (LinkedList<Edge *>::ListNode *ln = path.edges.getFirst(); ln != NULL; ln = ln->next) {
         //SERIAL_PRINTLN(ln->value->id);
         SERIAL_PRINT(ln->value->direction);
-        SERIAL_PRINT("\t");
+        SERIAL_PRINT(F("\t"));
         SERIAL_PRINTLN(ln->value->node->id);
-    }
+    }*/
+    
+    for(;;);
 }
 
 void loop()
 {
+    SERIAL_PRINTLN(F("node\tdirection"));
+    SERIAL_PRINT(current_node->id);
+    SERIAL_PRINT(F("\t"));
+    SERIAL_PRINTLN(current_direction);
     
+    set_search_path();
+    for (int i = 0; i < SEARCH_NODE_COUNT; i++) {
+        Path current_path(current_node);
+        Node *end_node = search_path[i];
+        reachable_node(current_node, end_node, &current_path);
+        
+        for (LinkedList<Edge *>::ListNode *ln = current_path.edges.getFirst(); ln != NULL; ln = ln->next) {
+            move(ln->value);
+            if (ln->value->node != end_node) {
+                // check for flame and if found, recover ball
+            }
+            
+            SERIAL_PRINT(current_node->id);
+            SERIAL_PRINT(F("\t"));
+            SERIAL_PRINTLN(current_direction);
+        }
+    }
+    for (;;);
 }
 
 uint16_t turn_cw()
@@ -145,10 +184,66 @@ uint16_t turn_ccw()
     return cycles_elapsed;
 }
 
+void realign()
+{
+    if (digitalRead(LINE_SENSE_L)) {
+        while (digitalRead(LINE_SENSE_L)) {
+            left_motor->brake();
+        }
+        left_motor->forward(L_SPEED(getBatteryStatus()));
+    }
+    if (digitalRead(LINE_SENSE_R)) {
+        while (digitalRead(LINE_SENSE_R)) {
+            right_motor->brake();
+        }
+        right_motor->forward(R_SPEED(getBatteryStatus()));
+    }
+}
+
+void move(Edge *edge)
+{
+    int delta = direction_delta(current_direction, edge->direction);
+    void (*turn_func)() = &turn_ccw;
+    
+    while (delta != 0) {
+        Edge *nearest_edge = current_node->edges;
+        int nearest_edge_delta = direction_delta(current_direction, nearest_edge->direction);
+        for (uint8_t i = 0; i < current_node->edge_count; i++) {
+            int this_edge_delta = direction_delta(current_direction, current_node->edges[i].direction);
+            
+            if (this_edge_delta > 0 && (nearest_edge_delta <= 0 || this_edge_delta < nearest_edge_delta)) {
+                nearest_edge = &current_node->edges[i];
+                nearest_edge_delta = this_edge_delta;
+            }
+        }
+        
+        //turn_func();
+        current_direction = nearest_edge->direction;
+        delta = direction_delta(current_direction, edge->direction);
+    }
+    
+    
+    left_motor->forward(L_SPEED(getBatteryStatus()));
+    right_motor->forward(R_SPEED(getBatteryStatus()));
+    while (!digitalRead(LINE_SENSE_R)) {
+        realign();
+    }
+    while (digitalRead(LINE_SENSE_R)) {
+        realign();
+    }
+    left_motor->brake();
+    right_motor->brake();
+    
+    current_node = edge->node;
+    current_direction = edge->direction;
+    
+}
+
 // Finds starting node and aligns along the horizontal axis
 void find_start_node()
 {
 #ifdef NO_SENSORS
+    current_direction = DIRECTION_NORTH;
     current_node = start_node_1;
     return;
 #endif
@@ -211,5 +306,45 @@ void find_start_node()
             current_node = start_node_3;
             current_direction = DIRECTION_EAST;
         }
+    }
+}
+
+void set_search_path()
+{
+    if (current_node == start_node_1) {
+        search_path = new Node *[SEARCH_NODE_COUNT] {
+            start_node_3,
+            left_intersection,
+            right_intersection,
+            start_node_2,
+            end_node
+        };
+    }
+    else if (current_node == start_node_2) {
+        search_path = new Node *[SEARCH_NODE_COUNT] {
+            end_node,
+            left_intersection,
+            right_intersection,
+            start_node_1,
+            start_node_3
+        };
+    }
+    else if (current_node == start_node_3) {
+        search_path = new Node *[SEARCH_NODE_COUNT] {
+            start_node_1,
+            right_intersection,
+            left_intersection,
+            end_node,
+            start_node_2
+        };
+    }
+    else if (current_node == end_node) {
+        search_path = new Node *[SEARCH_NODE_COUNT] {
+            start_node_2,
+            right_intersection,
+            left_intersection,
+            start_node_3,
+            start_node_1
+        };
     }
 }

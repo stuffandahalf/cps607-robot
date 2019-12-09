@@ -47,7 +47,7 @@ public:
     //inline void resume() { this->forward(); }
     
     //inline void forward() { this->forward(this->pwm); }
-    inline void forward(int16_t pwm)
+    void forward(int16_t pwm)
     {
         if (pwm == 0) {
             this->brake();
@@ -71,7 +71,7 @@ public:
     }
     
     //inline void reverse() { this->forward(this->pwm * -1); }
-    inline void reverse(int16_t pwm)
+    void reverse(int16_t pwm)
     {
         if (pwm < 0) {
             forward(pwm * -1);

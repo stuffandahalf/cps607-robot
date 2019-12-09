@@ -48,10 +48,6 @@ public:
         }
     }
     
-    LinkedList<T> *clone() {
-        return new LinkedList<T>(*this);
-    }
-    
     void add(T& value)
     {
         ListNode *newNode = new ListNode(/*value*/);
