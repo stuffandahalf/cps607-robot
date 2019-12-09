@@ -1,10 +1,12 @@
 #include "MotorControl.h"
 #include "Node.h"
 #include "SonarSensor.h"
+#include "ServoTimer2.h"
+//#include <Servo.h>
 
 // logic control macros
 #define SERIAL_DEBUG
-#define NO_SENSORS
+//#define NO_SENSORS
 
 #define USE_BATTERY_SENSE
 
@@ -16,14 +18,14 @@
 
 #define FLAME_SENSE     (A5)
 
-#define LINE_SENSE_L    (2)
-#define LINE_SENSE_R    (4)
+#define LINE_SENSE_L    (4)
+#define LINE_SENSE_R    (2)
 #define LINE_SENSE_B    (3)
 
 #define DISTANCE_SENSE_TRIGGER  (8)
 #define DISTANCE_SENSE_ECHO     (7)
 
-#define LIFT_SERVO      (11)    
+#define LIFT_SERVO      (11)
 
 #define BATTERY_SENSE   (A6)
 
@@ -47,10 +49,15 @@
 #define R_SPEED(x)  (BASE_SPEED(x))
 #define L_SPEED(x)  (BASE_SPEED(x) + 10)
 
+#define SERVO_LOW   (1000)
+#define SERVO_HIGH  (2000)
+
 MotorControl *left_motor;
 MotorControl *right_motor;
 
 SonarSensor *distance_sensor;
+
+ServoTimer2 lift_servo;
 
 Node *current_node;
 Direction current_direction;
@@ -90,6 +97,10 @@ void setup()
 
     distance_sensor = new SonarSensor(DISTANCE_SENSE_TRIGGER, DISTANCE_SENSE_ECHO);
     
+    lift_servo.attach(LIFT_SERVO);
+    lift_servo.read();
+    lift_servo.write(SERVO_LOW);
+    
     pinMode(LINE_SENSE_L, INPUT);
     pinMode(LINE_SENSE_R, INPUT);
     pinMode(LINE_SENSE_B, INPUT);
@@ -104,7 +115,7 @@ void setup()
     current_direction = DIRECTION_INVALID;
     
     init_nodes();
-    find_start_node();
+    //find_start_node();
     
     /*Path path(start_node_1);
     SERIAL_PRINTLN(F("HELLO WORLD"));
@@ -117,6 +128,40 @@ void setup()
         SERIAL_PRINT(F("\t"));
         SERIAL_PRINTLN(ln->value->node->id);
     }*/
+    
+    /*for (int i = 0; i < 180; i++) {
+        lift_servo.write(i);
+    }*/
+    //lift_servo.write(0);
+    
+    
+    /*for (int i = 0; i < 1000; i++) {
+        lift_servo.write(lift_servo.read() + 1);
+        //delay(10);
+    }*/
+    /*lift_servo.write(SERVO_HIGH);
+    delay(3000);
+    //lift_servo.read();
+    lift_servo.write(SERVO_LOW);*/
+    
+    /*left_motor->forward(L_SPEED(getBatteryStatus()));
+    right_motor->forward(R_SPEED(getBatteryStatus()));
+    delay(3000);
+    left_motor->brake();
+    right_motor->brake();*/
+    
+    /*for(;;) {
+        //SERIAL_PRINTLN(lift_servo.read());
+        lift_servo.write(lift_servo.read() - 1);
+    }*/
+    
+    for (;;) {
+        SERIAL_PRINT(digitalRead(LINE_SENSE_L));
+        SERIAL_PRINT('\t');
+        SERIAL_PRINT(digitalRead(LINE_SENSE_B));
+        SERIAL_PRINT('\t');
+        SERIAL_PRINTLN(digitalRead(LINE_SENSE_R));
+    }
     
     for(;;);
 }
