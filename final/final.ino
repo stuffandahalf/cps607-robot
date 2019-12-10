@@ -9,6 +9,7 @@
 //#define NO_SENSORS
 
 #define USE_BATTERY_SENSE
+//#define USE_AUTO_NODE_DETECT
 
 // peripheral pin macros
 #define MOTOR_RA    (10)
@@ -16,7 +17,9 @@
 #define MOTOR_LA    (6)
 #define MOTOR_LB    (5)
 
-#define FLAME_SENSE     (A5)
+#define FLAME_SENSE_F   (A3)
+#define FLAME_SENSE_L   (A4)
+#define FLAME_SENSE_R   (A5)
 
 #define LINE_SENSE_L    (4)
 #define LINE_SENSE_R    (2)
@@ -41,8 +44,8 @@
 #endif
 
 // Motor PWM
-//#define BASE_SPEED(x)   (54 + map(x, 0, 100, 60, 0))
-#define BASE_SPEED(x)   (54 + map(x, 0, 100, 90, 0))
+#define BASE_SPEED(x)   (54 + map(x, 0, 100, 80, 0))
+//#define BASE_SPEED(x)   (54 + map(x, 0, 100, 90, 0))
 //#define BASE_SPEED(x)  (54 + (100 - x) * 45 / 100 - 5)
 //#define BASE_SPEED(x)  (54 + (100 - x) * 58 / 100 - 5)
 //#define BASE_SPEED(x)  (75)
@@ -50,7 +53,7 @@
 #define L_SPEED(x)  (BASE_SPEED(x) + 10)
 
 #define SERVO_LOW   (1000)
-#define SERVO_HIGH  (2000)
+#define SERVO_HIGH  (1600)
 
 MotorControl *left_motor;
 MotorControl *right_motor;
@@ -59,14 +62,19 @@ SonarSensor *distance_sensor;
 
 ServoTimer2 lift_servo;
 
+uint8_t retrieved_balls;
 Node *current_node;
 Direction current_direction;
 
 #define SEARCH_NODE_COUNT   (5)
 Node **search_path;
 
+uint16_t turn_cw_flame();
+uint16_t turn_ccw_flame();
 uint16_t turn_cw();
 uint16_t turn_ccw();
+void retrieve_ball();
+
 void find_start_node();
 void set_search_path();
 void move(Edge *edge);
@@ -80,7 +88,7 @@ inline int getBatteryStatus()
     return map(analogRead(BATTERY_SENSE), 150, 650, 0, 100);
 #else
     //return 59;
-    return 34;
+    return 5;
 #endif
 }
 
@@ -99,23 +107,39 @@ void setup()
     
     lift_servo.attach(LIFT_SERVO);
     lift_servo.read();
-    lift_servo.write(SERVO_LOW);
+    lift_servo.write(SERVO_HIGH);
     
     pinMode(LINE_SENSE_L, INPUT);
     pinMode(LINE_SENSE_R, INPUT);
     pinMode(LINE_SENSE_B, INPUT);
     
-    pinMode(FLAME_SENSE, INPUT);
+    pinMode(FLAME_SENSE_F, INPUT);
+    pinMode(FLAME_SENSE_L, INPUT);
+    pinMode(FLAME_SENSE_R, INPUT);
 #endif
 
     pinMode(LED, OUTPUT);
     digitalWrite(LED, LOW);
     
+#ifdef USE_AUTO_NODE_DETECT
     current_node = NULL;
     current_direction = DIRECTION_INVALID;
+    find_start_node();
+#else
+    current_node = start_node_3;
+    current_direction = DIRECTION_EAST;
+#endif
     
-    init_nodes();
-    //find_start_node();
+    //SERIAL_PRINTLN(current_node->id);
+    /*Path path(current_node);
+    reachable_node(path.start, left_intersection, &path);
+    for (LinkedList<Edge *>::ListNode *ln = path.edges.getFirst(); ln != NULL; ln = ln->next) {
+        SERIAL_PRINT("FROM ");
+        SERIAL_PRINT(current_node->id);
+        SERIAL_PRINT(" TO ");
+        SERIAL_PRINTLN(ln->value->node->id);
+        move(ln->value);
+    }*/
     
     /*Path path(start_node_1);
     SERIAL_PRINTLN(F("HELLO WORLD"));
@@ -155,19 +179,26 @@ void setup()
         lift_servo.write(lift_servo.read() - 1);
     }*/
     
-    for (;;) {
+    /*for (;;) {
         SERIAL_PRINT(digitalRead(LINE_SENSE_L));
         SERIAL_PRINT('\t');
         SERIAL_PRINT(digitalRead(LINE_SENSE_B));
         SERIAL_PRINT('\t');
         SERIAL_PRINTLN(digitalRead(LINE_SENSE_R));
-    }
-    
-    for(;;);
+    }*/
 }
 
 void loop()
 {
+    if (retrieved_balls == 2) {
+        for (;;) {
+            digitalWrite(LED, HIGH);
+            delay(1000);
+            digitalWrite(LED, LOW);
+            delay(1000);
+        }
+    }
+    
     SERIAL_PRINTLN(F("node\tdirection"));
     SERIAL_PRINT(current_node->id);
     SERIAL_PRINT(F("\t"));
@@ -181,16 +212,75 @@ void loop()
         
         for (LinkedList<Edge *>::ListNode *ln = current_path.edges.getFirst(); ln != NULL; ln = ln->next) {
             move(ln->value);
-            if (ln->value->node != end_node) {
+            /*if (ln->value->node != end_node) {
                 // check for flame and if found, recover ball
-            }
+                if (digitalRead(FLAME_SENSE_L)) {
+                    turn_ccw_flame();
+                    retrieve_ball();
+                    turn_cw();
+                    goto ball_retrieved;
+                }
+                else if (digitalRead(FLAME_SENSE_R)) {
+                    turn_cw_flame();
+                    retrieve_ball();
+                    turn_ccw();
+                    goto ball_retrieved;
+                }
+                
+            }*/
             
             SERIAL_PRINT(current_node->id);
             SERIAL_PRINT(F("\t"));
             SERIAL_PRINTLN(current_direction);
         }
     }
-    for (;;);
+    
+    goto end;
+    //for (;;);
+ball_retrieved:
+    Path newPath(current_node);
+    reachable_node(current_node, end_node, &newPath);
+    for (LinkedList<Edge *>::ListNode *ln = newPath.edges.getFirst(); ln != NULL; ln = ln->next) {
+        move(ln->value);
+    }
+    lift_servo.write(SERVO_LOW);
+    delay(1000);
+    lift_servo.write(SERVO_HIGH);
+    delay(1000);
+    
+end:
+    ;
+
+}
+
+uint16_t turn_cw_flame()
+{
+    uint16_t cycles_elapsed = 0;
+    
+    left_motor->forward(L_SPEED(getBatteryStatus()));
+    right_motor->reverse(R_SPEED(getBatteryStatus()));
+    while (!digitalRead(FLAME_SENSE_F)) {
+        cycles_elapsed++;
+    }
+    left_motor->brake();
+    right_motor->brake();
+    
+    return cycles_elapsed;
+}
+
+uint16_t turn_ccw_flame()
+{
+    uint16_t cycles_elapsed = 0;
+    
+    left_motor->reverse(L_SPEED(getBatteryStatus()));
+    right_motor->forward(R_SPEED(getBatteryStatus()));
+    while (!digitalRead(FLAME_SENSE_F)) {
+        cycles_elapsed++;
+    }
+    left_motor->brake();
+    right_motor->brake();
+    
+    return cycles_elapsed;
 }
 
 uint16_t turn_cw()
@@ -200,13 +290,17 @@ uint16_t turn_cw()
     left_motor->forward(L_SPEED(getBatteryStatus()));
     right_motor->reverse(R_SPEED(getBatteryStatus()));
     while (!digitalRead(LINE_SENSE_R)) {
+        SERIAL_PRINTLN(F("NOT ON TAPE"));
         cycles_elapsed++;
     }
     while (digitalRead(LINE_SENSE_R)) {
+        SERIAL_PRINTLN(F("ON TAPE"));
         cycles_elapsed++;
     }
+    delay(100);
     left_motor->brake();
     right_motor->brake();
+    SERIAL_PRINTLN(F("ALIGNED"));
     
     return cycles_elapsed;
 }
@@ -229,6 +323,29 @@ uint16_t turn_ccw()
     return cycles_elapsed;
 }
 
+void retrieve_ball()
+{
+    lift_servo.write(SERVO_LOW);
+    delay(1000);
+    left_motor->forward(L_SPEED(getBatteryStatus()));
+    right_motor->forward(R_SPEED(getBatteryStatus()));
+    
+    while (distance_sensor->getDistance() > 450) {
+        SERIAL_PRINTLN(distance_sensor->getDistance());
+    }
+    
+    left_motor->brake();
+    right_motor->brake();
+    
+    lift_servo.write(SERVO_HIGH);
+    
+    left_motor->reverse(L_SPEED(getBatteryStatus()));
+    right_motor->reverse(R_SPEED(getBatteryStatus()));
+    while (!digitalRead(LINE_SENSE_L) && !digitalRead(LINE_SENSE_R));
+    left_motor->brake();
+    right_motor->brake();
+}
+
 void realign()
 {
     if (digitalRead(LINE_SENSE_L)) {
@@ -237,7 +354,7 @@ void realign()
         }
         left_motor->forward(L_SPEED(getBatteryStatus()));
     }
-    if (digitalRead(LINE_SENSE_R)) {
+    else if (digitalRead(LINE_SENSE_R)) {
         while (digitalRead(LINE_SENSE_R)) {
             right_motor->brake();
         }
@@ -262,7 +379,7 @@ void move(Edge *edge)
             }
         }
         
-        //turn_func();
+        turn_func();
         current_direction = nearest_edge->direction;
         delta = direction_delta(current_direction, edge->direction);
     }
@@ -270,11 +387,13 @@ void move(Edge *edge)
     
     left_motor->forward(L_SPEED(getBatteryStatus()));
     right_motor->forward(R_SPEED(getBatteryStatus()));
-    while (!digitalRead(LINE_SENSE_R)) {
+    while (!digitalRead(LINE_SENSE_B)) {
         realign();
+        delay(50);
     }
-    while (digitalRead(LINE_SENSE_R)) {
+    while (digitalRead(LINE_SENSE_B)) {
         realign();
+        delay(50);
     }
     left_motor->brake();
     right_motor->brake();
@@ -303,11 +422,11 @@ void find_start_node()
     
     // measure cycles to next tape
     first_cycles = turn_cw();
-    flame_on_first = digitalRead(FLAME_SENSE);
+    flame_on_first = digitalRead(FLAME_SENSE_F);
     
     // measure cycles to get back
     second_cycles = turn_cw();
-    flame_on_second = digitalRead(FLAME_SENSE);
+    flame_on_second = digitalRead(FLAME_SENSE_F);
     
     if (flame_on_first && flame_on_second) {
         // something has gone wrong

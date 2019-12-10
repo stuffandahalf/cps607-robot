@@ -70,8 +70,6 @@ extern Node *end_node;
 extern Node *left_intersection;
 extern Node *right_intersection;
 
-void init_nodes();
-void delete_nodes();
 bool reachable_node(Node * start, Node * end, Path *path);
 bool reachable_id(Node * start, uint8_t id, Path *path);
 
